@@ -117,3 +117,4 @@ WHERE email = 'seu@email.com';
 ## Licença
 
 Projeto privado — uso interno.
+# Cond_Manager
