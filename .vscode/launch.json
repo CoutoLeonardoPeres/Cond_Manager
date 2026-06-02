@@ -1,0 +1,48 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Cond Manager (Web)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define=SUPABASE_URL=https://wymvwzoahqygpvtasfxy.supabase.co",
+        "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5bXZ3em9haHF5Z3B2dGFzZnh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MzQzMDMsImV4cCI6MjA5NjAxMDMwM30.MeRkgpFZm2ayzSMcp3OYSbwIYhjc0jf7quEoCejv7_U"
+      ]
+    },
+    {
+      "name": "Cond Manager (Safari)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "deviceId": "web-server",
+      "toolArgs": [
+        "--dart-define=SUPABASE_URL=https://wymvwzoahqygpvtasfxy.supabase.co",
+        "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5bXZ3em9haHF5Z3B2dGFzZnh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MzQzMDMsImV4cCI6MjA5NjAxMDMwM30.MeRkgpFZm2ayzSMcp3OYSbwIYhjc0jf7quEoCejv7_U",
+        "--web-port=7357"
+      ]
+    },
+    {
+      "name": "Cond Manager (iOS)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=SUPABASE_URL=https://wymvwzoahqygpvtasfxy.supabase.co",
+        "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5bXZ3em9haHF5Z3B2dGFzZnh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MzQzMDMsImV4cCI6MjA5NjAxMDMwM30.MeRkgpFZm2ayzSMcp3OYSbwIYhjc0jf7quEoCejv7_U"
+      ]
+    },
+    {
+      "name": "Cond Manager (Android)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=SUPABASE_URL=https://wymvwzoahqygpvtasfxy.supabase.co",
+        "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5bXZ3em9haHF5Z3B2dGFzZnh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MzQzMDMsImV4cCI6MjA5NjAxMDMwM30.MeRkgpFZm2ayzSMcp3OYSbwIYhjc0jf7quEoCejv7_U"
+      ]
+    }
+  ]
+}
