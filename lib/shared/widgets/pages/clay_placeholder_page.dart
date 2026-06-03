@@ -6,7 +6,7 @@ class ClayPlaceholderPage extends StatelessWidget {
   const ClayPlaceholderPage({
     super.key,
     required this.title,
-    this.subtitle = 'Módulo em desenvolvimento',
+    this.subtitle = 'Em breve — módulo ainda não implementado no app',
     this.icon = Icons.auto_awesome_rounded,
   });
 

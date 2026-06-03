@@ -101,6 +101,11 @@ CREATE TYPE provider_type AS ENUM (
   'internal_team'
 );
 
+CREATE TYPE labor_source AS ENUM (
+  'third_party',
+  'internal_team'
+);
+
 CREATE TYPE approval_type AS ENUM (
   'budget',
   'execution',
@@ -131,6 +136,11 @@ CREATE TYPE financial_record_type AS ENUM (
   'expense',
   'income',
   'budget'
+);
+
+CREATE TYPE financial_scope AS ENUM (
+  'condominium',
+  'management_company'
 );
 
 CREATE TYPE location_type AS ENUM (
@@ -261,8 +271,17 @@ CREATE TABLE condominiums (
   syndic_email TEXT,
   -- Administradora
   manager_company TEXT,
+  manager_cnpj TEXT,
+  manager_contact_name TEXT,
   manager_phone TEXT,
   manager_email TEXT,
+  manager_street TEXT,
+  manager_number TEXT,
+  manager_complement TEXT,
+  manager_neighborhood TEXT,
+  manager_city TEXT,
+  manager_state TEXT,
+  manager_zip_code TEXT,
   -- Configurações
   settings JSONB NOT NULL DEFAULT '{}',
   status entity_status NOT NULL DEFAULT 'active',
@@ -481,8 +500,16 @@ CREATE TABLE materials (
   provider_id UUID REFERENCES providers(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   sku TEXT,
+  item_type TEXT NOT NULL DEFAULT 'material' CHECK (item_type IN ('material', 'equipment')),
+  is_storable BOOLEAN NOT NULL DEFAULT true,
   unit_of_measure TEXT NOT NULL DEFAULT 'un',
   unit_cost NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  purchase_tax_percent NUMERIC(5, 2) NOT NULL DEFAULT 0
+    CHECK (purchase_tax_percent >= 0 AND purchase_tax_percent <= 100),
+  resale_unit_price NUMERIC(14, 4) NOT NULL DEFAULT 0 CHECK (resale_unit_price >= 0),
+  resale_tax_percent NUMERIC(5, 2) NOT NULL DEFAULT 0
+    CHECK (resale_tax_percent >= 0 AND resale_tax_percent <= 100),
+  applicable_services service_type[] NOT NULL DEFAULT '{}',
   min_stock NUMERIC(14, 4) NOT NULL DEFAULT 0,
   current_stock NUMERIC(14, 4) NOT NULL DEFAULT 0,
   description TEXT,
@@ -496,6 +523,23 @@ CREATE INDEX idx_materials_condominium ON materials(condominium_id);
 CREATE INDEX idx_materials_category ON materials(category_id);
 CREATE INDEX idx_materials_low_stock ON materials(condominium_id)
   WHERE current_stock <= min_stock AND status = 'active';
+CREATE INDEX idx_materials_services ON materials USING GIN (applicable_services);
+CREATE INDEX idx_materials_item_type ON materials(item_type);
+
+CREATE TABLE material_supplier_links (
+  material_id UUID NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+  provider_id UUID NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+  condominium_id UUID NOT NULL REFERENCES condominiums(id) ON DELETE CASCADE,
+  is_primary BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (material_id, provider_id)
+);
+
+CREATE INDEX idx_material_supplier_provider ON material_supplier_links(provider_id);
+CREATE INDEX idx_material_supplier_condo ON material_supplier_links(condominium_id);
+CREATE UNIQUE INDEX idx_material_supplier_one_primary
+  ON material_supplier_links(material_id)
+  WHERE is_primary = true;
 
 CREATE TABLE stock_movements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -673,7 +717,13 @@ CREATE TABLE work_order_materials (
   quantity NUMERIC(14, 4) NOT NULL,
   unit_of_measure TEXT NOT NULL DEFAULT 'un',
   unit_cost NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  purchase_tax_percent NUMERIC(5, 2) DEFAULT 0,
   total_cost NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  total_cost_with_tax NUMERIC(14, 2) DEFAULT 0,
+  unit_resale_price NUMERIC(14, 4) DEFAULT 0,
+  resale_tax_percent NUMERIC(5, 2) DEFAULT 0,
+  total_resale NUMERIC(14, 2) DEFAULT 0,
+  total_resale_with_tax NUMERIC(14, 2) DEFAULT 0,
   stock_movement_id UUID REFERENCES stock_movements(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -681,14 +731,78 @@ CREATE TABLE work_order_materials (
 CREATE TABLE work_order_labor (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   work_order_id UUID NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  labor_source labor_source NOT NULL DEFAULT 'third_party',
+  service_type service_type NOT NULL DEFAULT 'other',
   provider_id UUID REFERENCES providers(id),
+  profile_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   worker_name TEXT NOT NULL,
+  worker_count INT NOT NULL DEFAULT 1 CHECK (worker_count >= 1),
   hours NUMERIC(8, 2) NOT NULL DEFAULT 0,
   hourly_rate NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  travel_cost NUMERIC(14, 2) NOT NULL DEFAULT 0 CHECK (travel_cost >= 0),
   total_cost NUMERIC(14, 2) NOT NULL DEFAULT 0,
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE OR REPLACE FUNCTION work_order_labor_compute_total()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.total_cost := (NEW.worker_count * NEW.hours * NEW.hourly_rate) + NEW.travel_cost;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER work_order_labor_compute_total_trg
+  BEFORE INSERT OR UPDATE ON work_order_labor
+  FOR EACH ROW EXECUTE FUNCTION work_order_labor_compute_total();
+
+CREATE OR REPLACE FUNCTION refresh_work_order_labor_totals()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  wo_id UUID;
+  labor_sum NUMERIC(14, 2);
+  travel_sum NUMERIC(14, 2);
+  material_sum NUMERIC(14, 2);
+BEGIN
+  wo_id := COALESCE(NEW.work_order_id, OLD.work_order_id);
+
+  SELECT COALESCE(SUM(worker_count * hours * hourly_rate), 0),
+         COALESCE(SUM(travel_cost), 0)
+    INTO labor_sum, travel_sum
+    FROM work_order_labor
+   WHERE work_order_id = wo_id;
+
+  SELECT COALESCE(material_cost, 0) INTO material_sum
+    FROM work_orders WHERE id = wo_id;
+
+  UPDATE work_orders
+     SET labor_cost = labor_sum,
+         travel_cost = travel_sum,
+         actual_cost = material_sum + labor_sum + travel_sum
+   WHERE id = wo_id;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE TRIGGER work_order_labor_refresh_wo_costs_ins
+  AFTER INSERT ON work_order_labor
+  FOR EACH ROW EXECUTE FUNCTION refresh_work_order_labor_totals();
+
+CREATE TRIGGER work_order_labor_refresh_wo_costs_upd
+  AFTER UPDATE ON work_order_labor
+  FOR EACH ROW EXECUTE FUNCTION refresh_work_order_labor_totals();
+
+CREATE TRIGGER work_order_labor_refresh_wo_costs_del
+  AFTER DELETE ON work_order_labor
+  FOR EACH ROW EXECUTE FUNCTION refresh_work_order_labor_totals();
 
 CREATE TABLE work_order_attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -824,22 +938,34 @@ CREATE TRIGGER preventive_plans_updated_at
 
 CREATE TABLE financial_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  condominium_id UUID NOT NULL REFERENCES condominiums(id) ON DELETE CASCADE,
+  scope financial_scope NOT NULL DEFAULT 'condominium',
+  condominium_id UUID REFERENCES condominiums(id) ON DELETE CASCADE,
   record_type financial_record_type NOT NULL,
   category TEXT NOT NULL,
   description TEXT NOT NULL,
   amount NUMERIC(14, 2) NOT NULL,
+  tax_amount NUMERIC(14, 2) NOT NULL DEFAULT 0 CHECK (tax_amount >= 0),
+  labor_hours NUMERIC(10, 2) CHECK (labor_hours IS NULL OR labor_hours >= 0),
+  hourly_rate NUMERIC(14, 2) CHECK (hourly_rate IS NULL OR hourly_rate >= 0),
+  material_id UUID REFERENCES materials(id) ON DELETE SET NULL,
   reference_date DATE NOT NULL DEFAULT CURRENT_DATE,
   due_date DATE,
   paid_at TIMESTAMPTZ,
   work_order_id UUID REFERENCES work_orders(id) ON DELETE SET NULL,
   provider_id UUID REFERENCES providers(id) ON DELETE SET NULL,
+  notes TEXT,
   created_by UUID REFERENCES profiles(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT financial_scope_condo CHECK (
+    (scope = 'condominium' AND condominium_id IS NOT NULL)
+    OR (scope = 'management_company')
+  )
 );
 
 CREATE INDEX idx_financial_condominium ON financial_records(condominium_id);
+CREATE INDEX idx_financial_scope ON financial_records(scope);
+CREATE INDEX idx_financial_category ON financial_records(category);
 CREATE INDEX idx_financial_type ON financial_records(record_type);
 CREATE INDEX idx_financial_date ON financial_records(reference_date);
 CREATE INDEX idx_financial_work_order ON financial_records(work_order_id);
@@ -959,6 +1085,38 @@ AS $$
     );
 $$;
 
+CREATE OR REPLACE FUNCTION can_view_management_financial()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT is_platform_admin()
+    OR EXISTS (
+      SELECT 1 FROM user_condominium_roles
+      WHERE user_id = auth.uid()
+        AND status = 'active'
+        AND role IN ('condominium_admin', 'financial', 'maintenance_manager', 'auditor')
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION can_manage_management_financial()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT is_platform_admin()
+    OR EXISTS (
+      SELECT 1 FROM user_condominium_roles
+      WHERE user_id = auth.uid()
+        AND status = 'active'
+        AND role IN ('condominium_admin', 'financial')
+    );
+$$;
+
 -- View: número formatado de chamado/OS por condomínio
 CREATE OR REPLACE VIEW ticket_summary AS
 SELECT
@@ -1006,6 +1164,7 @@ ALTER TABLE provider_contracts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provider_evaluations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE material_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE material_supplier_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ticket_attachments ENABLE ROW LEVEL SECURITY;
@@ -1124,6 +1283,21 @@ CREATE POLICY materials_modify ON materials FOR ALL
   USING (
     get_user_role(condominium_id) IN (
       'condominium_admin', 'maintenance_manager', 'caretaker', 'internal_employee'
+    ) OR is_platform_admin()
+  )
+  WITH CHECK (
+    get_user_role(condominium_id) IN (
+      'condominium_admin', 'maintenance_manager', 'caretaker'
+    ) OR is_platform_admin()
+  );
+
+CREATE POLICY material_supplier_links_select ON material_supplier_links FOR SELECT
+  USING (has_condominium_access(condominium_id));
+
+CREATE POLICY material_supplier_links_modify ON material_supplier_links FOR ALL
+  USING (
+    get_user_role(condominium_id) IN (
+      'condominium_admin', 'maintenance_manager', 'caretaker'
     ) OR is_platform_admin()
   )
   WITH CHECK (
@@ -1301,16 +1475,21 @@ CREATE POLICY notifications_own ON notifications FOR ALL
 
 -- FINANCIAL
 CREATE POLICY financial_select ON financial_records FOR SELECT
-  USING (can_view_financial(condominium_id));
+  USING (
+    (scope = 'condominium' AND condominium_id IS NOT NULL AND can_view_financial(condominium_id))
+    OR (scope = 'management_company' AND can_view_management_financial())
+  );
 
 CREATE POLICY financial_modify ON financial_records FOR ALL
   USING (
-    get_user_role(condominium_id) IN ('condominium_admin', 'financial')
-    OR is_platform_admin()
+    (scope = 'condominium' AND condominium_id IS NOT NULL
+      AND get_user_role(condominium_id) IN ('condominium_admin', 'financial'))
+    OR (scope = 'management_company' AND can_manage_management_financial())
   )
   WITH CHECK (
-    get_user_role(condominium_id) IN ('condominium_admin', 'financial')
-    OR is_platform_admin()
+    (scope = 'condominium' AND condominium_id IS NOT NULL
+      AND get_user_role(condominium_id) IN ('condominium_admin', 'financial'))
+    OR (scope = 'management_company' AND can_manage_management_financial())
   );
 
 -- STORAGE POLICIES

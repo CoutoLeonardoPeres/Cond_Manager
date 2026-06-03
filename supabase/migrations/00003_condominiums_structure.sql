@@ -24,8 +24,17 @@ CREATE TABLE condominiums (
   syndic_email TEXT,
   -- Administradora
   manager_company TEXT,
+  manager_cnpj TEXT,
+  manager_contact_name TEXT,
   manager_phone TEXT,
   manager_email TEXT,
+  manager_street TEXT,
+  manager_number TEXT,
+  manager_complement TEXT,
+  manager_neighborhood TEXT,
+  manager_city TEXT,
+  manager_state TEXT,
+  manager_zip_code TEXT,
   -- Configurações
   settings JSONB NOT NULL DEFAULT '{}',
   status entity_status NOT NULL DEFAULT 'active',

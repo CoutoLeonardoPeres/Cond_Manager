@@ -16,7 +16,7 @@ final currentProfileProvider = FutureProvider<UserProfile?>((ref) async {
   final result = await repo.getCurrentProfile();
   return result.when(
     success: (profile) => profile,
-    failure: (_) => null,
+    failure: (error) => throw error,
   );
 });
 

@@ -38,17 +38,20 @@ class ClayStatCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.accentColor,
+    this.onTap,
   });
 
   final String title;
   final String value;
   final IconData icon;
   final Color accentColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return ClayCard(
       depth: ClayDepth.floating,
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

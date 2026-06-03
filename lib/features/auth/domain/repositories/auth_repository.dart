@@ -1,4 +1,5 @@
 import 'package:cond_manager/core/utils/result.dart';
+import 'package:cond_manager/features/auth/domain/entities/user_invitation_preview.dart';
 import 'package:cond_manager/features/auth/domain/entities/user_profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -15,4 +16,6 @@ abstract interface class AuthRepository {
   Future<Result<void>> resetPassword(String email);
   Future<Result<void>> signOut();
   Future<Result<UserProfile>> getCurrentProfile();
+  Future<Result<UserInvitationPreview>> getInvitationPreview(String token);
+  Future<Result<void>> acceptInvitation(String token);
 }

@@ -1,6 +1,7 @@
 import 'package:cond_manager/core/theme/clay_decorations.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class ClayTextField extends StatelessWidget {
   const ClayTextField({
@@ -15,6 +16,8 @@ class ClayTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.maxLines = 1,
+    this.readOnly = false,
+    this.inputFormatters,
   });
 
   final TextEditingController? controller;
@@ -27,6 +30,8 @@ class ClayTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final void Function(String)? onChanged;
   final int maxLines;
+  final bool readOnly;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +66,8 @@ class ClayTextField extends StatelessWidget {
             validator: validator,
             onChanged: onChanged,
             maxLines: maxLines,
+            readOnly: readOnly,
+            inputFormatters: inputFormatters,
             style: const TextStyle(
               fontWeight: FontWeight.w500,
               color: ClayTokens.textPrimary,

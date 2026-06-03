@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class AppConfig {
   const AppConfig({
     required this.supabaseUrl,
@@ -7,13 +9,24 @@ class AppConfig {
   final String supabaseUrl;
   final String supabaseAnonKey;
 
-  static AppConfig fromEnvironment() {
-    const url = String.fromEnvironment('SUPABASE_URL');
-    const key = String.fromEnvironment('SUPABASE_ANON_KEY');
+  /// Lê credenciais de `--dart-define` ou do arquivo `.env` (dev local).
+  static Future<AppConfig> load() async {
+    try {
+      await dotenv.load(fileName: '.env');
+    } catch (_) {
+      // .env ausente em release ou asset não embutido — usa dart-define.
+    }
+
+    var url = const String.fromEnvironment('SUPABASE_URL');
+    var key = const String.fromEnvironment('SUPABASE_ANON_KEY');
+
+    if (url.isEmpty) url = dotenv.env['SUPABASE_URL']?.trim() ?? '';
+    if (key.isEmpty) key = dotenv.env['SUPABASE_ANON_KEY']?.trim() ?? '';
 
     if (url.isEmpty || key.isEmpty) {
       throw StateError(
-        'Defina SUPABASE_URL e SUPABASE_ANON_KEY via --dart-define ou .vscode/launch.json',
+        'Configure SUPABASE_URL e SUPABASE_ANON_KEY no arquivo .env '
+        'ou via --dart-define / launch.json.',
       );
     }
 

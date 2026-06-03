@@ -1,3 +1,4 @@
+import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
@@ -10,7 +11,7 @@ class AppShellPage extends ConsumerWidget {
 
   final Widget child;
 
-  static const _destinations = [
+  static const _allDestinations = [
     _NavItem('/', Icons.dashboard_rounded, 'Dashboard'),
     _NavItem('/condominiums', Icons.apartment_rounded, 'Condomínios'),
     _NavItem('/tickets', Icons.support_agent_rounded, 'Chamados'),
@@ -25,14 +26,29 @@ class AppShellPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(currentProfileProvider);
+    final profile = profileAsync.value;
+    final allowedPaths = profile.permissions.allowedNavPaths;
+
+    final destinations = _allDestinations
+        .where((d) => allowedPaths.any((p) => d.path == p))
+        .toList();
+    if (destinations.isEmpty) {
+      return const Center(child: Text('Sem módulos disponíveis para seu perfil.'));
+    }
+
     final location = GoRouterState.of(context).uri.path;
-    final selectedIndex = _destinations.indexWhere((d) => d.path == location);
+    final selectedIndex = destinations.indexWhere((d) {
+      if (d.path == '/') return location == '/';
+      return location == d.path || location.startsWith('${d.path}/');
+    });
     final safeIndex = selectedIndex < 0 ? 0 : selectedIndex;
     final isWide = MediaQuery.sizeOf(context).width >= 960;
 
-    final navItems = _destinations
+    final navItems = destinations
         .map((d) => ClayNavItem(icon: d.icon, label: d.label))
         .toList();
+
+    final bottomCount = navItems.length.clamp(1, 5);
 
     return ClayScaffold(
       appBar: ClayAppBar(
@@ -96,9 +112,9 @@ class AppShellPage extends ConsumerWidget {
       bottomNavigationBar: isWide
           ? null
           : ClayBottomNav(
-              items: navItems.take(5).toList(),
-              selectedIndex: safeIndex.clamp(0, 4),
-              onSelected: (i) => context.go(_destinations[i].path),
+              items: navItems.take(bottomCount).toList(),
+              selectedIndex: safeIndex.clamp(0, bottomCount - 1),
+              onSelected: (i) => context.go(destinations[i].path),
             ),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -109,7 +125,7 @@ class AppShellPage extends ConsumerWidget {
               child: ClayNavRail(
                 items: navItems,
                 selectedIndex: safeIndex,
-                onSelected: (i) => context.go(_destinations[i].path),
+                onSelected: (i) => context.go(destinations[i].path),
               ),
             ),
           Expanded(

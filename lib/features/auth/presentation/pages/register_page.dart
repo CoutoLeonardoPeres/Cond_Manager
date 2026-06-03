@@ -1,4 +1,3 @@
-import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
@@ -87,82 +86,135 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             ),
           ),
           Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: ClaySurface(
-                    depth: ClayDepth.floating,
-                    radius: ClayTokens.radiusXl,
-                    padding: const EdgeInsets.all(32),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (_message != null) ...[
-                            ClaySurface(
-                              depth: ClayDepth.pressed,
-                              color: (_isSuccess ? ClayTokens.success : ClayTokens.error)
-                                  .withValues(alpha: 0.1),
-                              radius: ClayTokens.radiusSm,
-                              padding: const EdgeInsets.all(14),
-                              child: Text(
-                                _message!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _isSuccess ? ClayTokens.success : ClayTokens.error,
-                                  fontWeight: FontWeight.w500,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = formColumnsForWidth(constraints.maxWidth);
+
+                return Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1100),
+                      child: ClaySurface(
+                        depth: ClayDepth.floating,
+                        radius: ClayTokens.radiusXl,
+                        padding: const EdgeInsets.all(32),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (_message != null) ...[
+                                ClaySurface(
+                                  depth: ClayDepth.pressed,
+                                  color: (_isSuccess ? ClayTokens.success : ClayTokens.error)
+                                      .withValues(alpha: 0.1),
+                                  radius: ClayTokens.radiusSm,
+                                  padding: const EdgeInsets.all(14),
+                                  child: Text(
+                                    _message!,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: _isSuccess ? ClayTokens.success : ClayTokens.error,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
+                                const SizedBox(height: 20),
+                              ],
+                              FormGridSection(
+                                title: 'Dados da conta',
+                                columns: columns,
+                                items: [
+                                  FormGridField(
+                                    child: ClayTextField(
+                                      controller: _nameController,
+                                      label: 'Nome completo',
+                                      prefixIcon: const Icon(
+                                        Icons.person_outline_rounded,
+                                        color: ClayTokens.textMuted,
+                                      ),
+                                      validator: (v) =>
+                                          v == null || v.isEmpty ? 'Informe o nome' : null,
+                                    ),
+                                  ),
+                                  FormGridField(
+                                    child: ClayTextField(
+                                      controller: _emailController,
+                                      label: 'E-mail',
+                                      keyboardType: TextInputType.emailAddress,
+                                      prefixIcon: const Icon(
+                                        Icons.email_outlined,
+                                        color: ClayTokens.textMuted,
+                                      ),
+                                      validator: (v) =>
+                                          v == null || !v.contains('@') ? 'E-mail inválido' : null,
+                                    ),
+                                  ),
+                                  FormGridField(
+                                    child: ClayTextField(
+                                      controller: _passwordController,
+                                      label: 'Senha (mín. 6 caracteres)',
+                                      obscureText: true,
+                                      prefixIcon: const Icon(
+                                        Icons.lock_outline_rounded,
+                                        color: ClayTokens.textMuted,
+                                      ),
+                                      validator: (v) =>
+                                          v == null || v.length < 6 ? 'Mínimo 6 caracteres' : null,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-                          ClayTextField(
-                            controller: _nameController,
-                            label: 'Nome completo',
-                            prefixIcon: const Icon(Icons.person_outline_rounded, color: ClayTokens.textMuted),
-                            validator: (v) =>
-                                v == null || v.isEmpty ? 'Informe o nome' : null,
+                              const SizedBox(height: 24),
+                              if (columns < 2) ...[
+                                ClayButton(
+                                  label: 'Cadastrar',
+                                  isLoading: _isLoading,
+                                  onPressed: _register,
+                                  icon: Icons.person_add_rounded,
+                                ),
+                                const SizedBox(height: 12),
+                                ClayButton(
+                                  label: 'Já tenho conta',
+                                  variant: ClayButtonVariant.secondary,
+                                  onPressed: () => context.go('/login'),
+                                ),
+                              ] else
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 180,
+                                        child: ClayButton(
+                                          label: 'Já tenho conta',
+                                          variant: ClayButtonVariant.secondary,
+                                          onPressed: () => context.go('/login'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 200,
+                                        child: ClayButton(
+                                          label: 'Cadastrar',
+                                          isLoading: _isLoading,
+                                          onPressed: _register,
+                                          icon: Icons.person_add_rounded,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(height: 18),
-                          ClayTextField(
-                            controller: _emailController,
-                            label: 'E-mail',
-                            keyboardType: TextInputType.emailAddress,
-                            prefixIcon: const Icon(Icons.email_outlined, color: ClayTokens.textMuted),
-                            validator: (v) =>
-                                v == null || !v.contains('@') ? 'E-mail inválido' : null,
-                          ),
-                          const SizedBox(height: 18),
-                          ClayTextField(
-                            controller: _passwordController,
-                            label: 'Senha (mín. 6 caracteres)',
-                            obscureText: true,
-                            prefixIcon: const Icon(Icons.lock_outline_rounded, color: ClayTokens.textMuted),
-                            validator: (v) =>
-                                v == null || v.length < 6 ? 'Mínimo 6 caracteres' : null,
-                          ),
-                          const SizedBox(height: 28),
-                          ClayButton(
-                            label: 'Cadastrar',
-                            isLoading: _isLoading,
-                            onPressed: _register,
-                            icon: Icons.person_add_rounded,
-                          ),
-                          const SizedBox(height: 12),
-                          ClayButton(
-                            label: 'Já tenho conta',
-                            variant: ClayButtonVariant.secondary,
-                            onPressed: () => context.go('/login'),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
