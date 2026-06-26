@@ -163,6 +163,7 @@ class WorkOrderModel {
     if (input.providerId != null) map['provider_id'] = input.providerId;
     if (input.unitId != null) map['unit_id'] = input.unitId;
     if (input.commonAreaId != null) map['common_area_id'] = input.commonAreaId;
+    if (input.rentalPropertyId != null) map['rental_property_id'] = input.rentalPropertyId;
     final loc = input.locationDescription?.trim();
     if (loc != null && loc.isNotEmpty) map['location_description'] = loc;
     if (input.dueDate != null) {

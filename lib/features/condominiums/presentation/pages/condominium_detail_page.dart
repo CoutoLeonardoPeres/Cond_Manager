@@ -3,6 +3,7 @@ import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/core/router/navigation_helpers.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
+import 'package:cond_manager/features/condominiums/presentation/condominium_route_prefix.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
@@ -11,9 +12,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 class CondominiumDetailPage extends ConsumerWidget {
-  const CondominiumDetailPage({super.key, required this.condominiumId});
+  const CondominiumDetailPage({
+    super.key,
+    required this.condominiumId,
+    this.routePrefix = CondominiumRoutePrefix.maintenance,
+  });
 
   final String condominiumId;
+  final CondominiumRoutePrefix routePrefix;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,7 +65,7 @@ class CondominiumDetailPage extends ConsumerWidget {
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back_rounded),
                       onPressed: () => context.go(
-                        resolveReturnPath(context, fallback: '/condominiums'),
+                        resolveReturnPath(context, fallback: routePrefix.list),
                       ),
                     ),
                   ),
@@ -166,7 +172,7 @@ class CondominiumDetailPage extends ConsumerWidget {
                   label: 'Editar dados',
                   expand: false,
                   icon: Icons.edit_rounded,
-                  onPressed: () => context.go('/condominiums/$condominiumId/edit'),
+                  onPressed: () => context.go(routePrefix.edit(condominiumId)),
                 ),
               ),
           ],

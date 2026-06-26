@@ -96,7 +96,7 @@ class CondominiumModel {
     );
   }
 
-  Map<String, dynamic> toInsertJson({String? createdBy}) {
+  Map<String, dynamic> toInsertJson({String? createdBy, String? managementCompanyId}) {
     String? t(String? v) {
       final s = v?.trim();
       return s != null && s.isNotEmpty ? s : null;
@@ -129,6 +129,7 @@ class CondominiumModel {
       if (t(managerState) != null) 'manager_state': t(managerState),
       if (t(managerZipCode) != null) 'manager_zip_code': t(managerZipCode),
       if (createdBy != null) 'created_by': createdBy,
+      if (managementCompanyId != null) 'management_company_id': managementCompanyId,
     };
   }
 

@@ -59,6 +59,9 @@ class AccessLogRepositoryImpl implements AccessLogRepository {
       if (filter.companyId != null) {
         query = query.eq('company_id', filter.companyId!);
       }
+      if (filter.condominiumId != null) {
+        query = query.eq('condominium_id', filter.condominiumId!);
+      }
       if (filter.year != null) {
         query = query.eq('access_year', filter.year!);
       }

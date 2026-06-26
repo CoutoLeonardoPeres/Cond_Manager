@@ -42,6 +42,7 @@ class AccessSessionLog extends Equatable {
 class AccessLogFilter extends Equatable {
   const AccessLogFilter({
     this.companyId,
+    this.condominiumId,
     this.year,
     this.month,
     this.day,
@@ -49,6 +50,7 @@ class AccessLogFilter extends Equatable {
   });
 
   final String? companyId;
+  final String? condominiumId;
   final int? year;
   final int? month;
   final int? day;
@@ -56,11 +58,13 @@ class AccessLogFilter extends Equatable {
 
   AccessLogFilter copyWith({
     String? companyId,
+    String? condominiumId,
     int? year,
     int? month,
     int? day,
     String? userNameQuery,
     bool clearCompany = false,
+    bool clearCondominium = false,
     bool clearYear = false,
     bool clearMonth = false,
     bool clearDay = false,
@@ -68,6 +72,8 @@ class AccessLogFilter extends Equatable {
   }) {
     return AccessLogFilter(
       companyId: clearCompany ? null : (companyId ?? this.companyId),
+      condominiumId:
+          clearCondominium ? null : (condominiumId ?? this.condominiumId),
       year: clearYear ? null : (year ?? this.year),
       month: clearMonth ? null : (month ?? this.month),
       day: clearDay ? null : (day ?? this.day),
@@ -76,7 +82,8 @@ class AccessLogFilter extends Equatable {
   }
 
   @override
-  List<Object?> get props => [companyId, year, month, day, userNameQuery];
+  List<Object?> get props =>
+      [companyId, condominiumId, year, month, day, userNameQuery];
 }
 
 class AccessLogSummary extends Equatable {

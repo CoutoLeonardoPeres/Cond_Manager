@@ -1,0 +1,698 @@
+import 'package:cond_manager/core/errors/app_exception.dart'
+    show AppAuthException, AppException, NetworkException, PermissionException;
+import 'package:cond_manager/core/utils/result.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_booking.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_party.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_pnl.dart';
+import 'package:cond_manager/features/rental/domain/repositories/rental_repository.dart';
+import 'package:cond_manager/shared/domain/enums/rental_booking_channel.dart';
+import 'package:cond_manager/shared/domain/enums/rental_booking_status.dart';
+import 'package:cond_manager/shared/domain/enums/rental_charge_status.dart';
+import 'package:cond_manager/shared/domain/enums/rental_charge_type.dart';
+import 'package:cond_manager/shared/domain/enums/rental_lease_status.dart';
+import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
+import 'package:cond_manager/shared/domain/enums/rental_property_type.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class RentalRepositoryImpl implements RentalRepository {
+  RentalRepositoryImpl(this._client);
+
+  final SupabaseClient _client;
+
+  static const _propertySelect = '''
+    id, company_id, condominium_id, owner_party_id, property_type, listing_mode,
+    code, title, description, address_street, address_number, address_neighborhood,
+    address_city, address_state, address_zip, area_sqm, bedrooms, bathrooms, max_guests,
+    base_rent_amount, base_daily_rate, deposit_amount, status,
+    condominiums ( name )
+  ''';
+
+  @override
+  Future<Result<List<RentalProperty>>> listProperties(
+    RentalPropertyListFilter filter,
+  ) async {
+    try {
+      var query = _client.from('rental_properties').select(_propertySelect);
+      if (filter.propertyType != null) {
+        query = query.eq('property_type', filter.propertyType!.value);
+      }
+      if (filter.listingMode != null) {
+        query = query.eq('listing_mode', filter.listingMode!.value);
+      }
+      final data = await query.order('title').limit(300);
+      final list = <RentalProperty>[];
+      for (final raw in data as List<dynamic>) {
+        final p = _propertyFromMap(raw as Map<String, dynamic>);
+        if (filter.search?.trim().isNotEmpty == true) {
+          final q = filter.search!.toLowerCase();
+          if (!p.title.toLowerCase().contains(q) &&
+              !(p.code?.toLowerCase().contains(q) ?? false)) {
+            continue;
+          }
+        }
+        list.add(p);
+      }
+      return Success(list);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar imóveis: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalProperty>> getProperty(String id) async {
+    try {
+      final data = await _client
+          .from('rental_properties')
+          .select(_propertySelect)
+          .eq('id', id)
+          .single();
+      return Success(_propertyFromMap(data));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao buscar imóvel: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalProperty>> createProperty(RentalPropertyInput input) async {
+    return _saveProperty(input);
+  }
+
+  @override
+  Future<Result<RentalProperty>> updateProperty(
+    String id,
+    RentalPropertyInput input,
+  ) async {
+    return _saveProperty(input, id: id);
+  }
+
+  Future<Result<RentalProperty>> _saveProperty(
+    RentalPropertyInput input, {
+    String? id,
+  }) async {
+    try {
+      final row = _propertyPayload(input);
+      final dynamic data;
+      if (id == null) {
+        data = await _client.from('rental_properties').insert(row).select(_propertySelect).single();
+      } else {
+        data = await _client.from('rental_properties').update(row).eq('id', id).select(_propertySelect).single();
+      }
+      return Success(_propertyFromMap(data as Map<String, dynamic>));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao salvar imóvel: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<RentalParty>>> listParties() async {
+    try {
+      final data = await _client
+          .from('rental_parties')
+          .select('id, company_id, full_name, email, phone, document_number, notes, status')
+          .order('full_name')
+          .limit(300);
+      return Success((data as List).map((e) => _partyFromMap(e as Map<String, dynamic>)).toList());
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar pessoas: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalParty>> getParty(String id) async {
+    try {
+      final data = await _client.from('rental_parties').select().eq('id', id).single();
+      return Success(_partyFromMap(data));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao buscar pessoa: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalParty>> createParty(RentalPartyInput input) async {
+    return _saveParty(input);
+  }
+
+  @override
+  Future<Result<RentalParty>> updateParty(String id, RentalPartyInput input) async {
+    return _saveParty(input, id: id);
+  }
+
+  Future<Result<RentalParty>> _saveParty(RentalPartyInput input, {String? id}) async {
+    try {
+      final row = {
+        'company_id': input.companyId,
+        'full_name': input.fullName.trim(),
+        'email': input.email?.trim(),
+        'phone': input.phone?.trim(),
+        'document_number': input.documentNumber?.trim(),
+        'notes': input.notes?.trim(),
+        'status': input.status,
+      };
+      final dynamic data;
+      if (id == null) {
+        data = await _client.from('rental_parties').insert(row).select().single();
+      } else {
+        data = await _client.from('rental_parties').update(row).eq('id', id).select().single();
+      }
+      return Success(_partyFromMap(data as Map<String, dynamic>));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao salvar pessoa: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<RentalLease>>> listLeases() async {
+    try {
+      final data = await _client.from('rental_leases').select(_leaseSelect).order('start_date', ascending: false).limit(300);
+      return Success((data as List).map((e) => _leaseFromMap(e as Map<String, dynamic>)).toList());
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar contratos: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalLease>> getLease(String id) async {
+    try {
+      final data = await _client.from('rental_leases').select(_leaseSelect).eq('id', id).single();
+      return Success(_leaseFromMap(data));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao buscar contrato: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalLease>> createLease(RentalLeaseInput input) async {
+    return _saveLease(input);
+  }
+
+  @override
+  Future<Result<RentalLease>> updateLease(String id, RentalLeaseInput input) async {
+    return _saveLease(input, id: id);
+  }
+
+  Future<Result<RentalLease>> _saveLease(RentalLeaseInput input, {String? id}) async {
+    try {
+      final row = {
+        'company_id': input.companyId,
+        'property_id': input.propertyId,
+        'unit_id': input.unitId,
+        'primary_tenant_party_id': input.primaryTenantPartyId,
+        'lease_number': input.leaseNumber?.trim(),
+        'listing_mode': input.listingMode.value,
+        'status': input.status.value,
+        'start_date': _dateStr(input.startDate),
+        'end_date': input.endDate != null ? _dateStr(input.endDate!) : null,
+        'monthly_rent': input.monthlyRent,
+        'deposit_amount': input.depositAmount,
+        'due_day_of_month': input.dueDayOfMonth,
+        'notes': input.notes?.trim(),
+      };
+      final dynamic data;
+      if (id == null) {
+        data = await _client.from('rental_leases').insert(row).select(_leaseSelect).single();
+      } else {
+        data = await _client.from('rental_leases').update(row).eq('id', id).select(_leaseSelect).single();
+      }
+      return Success(_leaseFromMap(data as Map<String, dynamic>));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao salvar contrato: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<RentalBooking>>> listBookings({
+    DateTime? from,
+    DateTime? to,
+    String? propertyId,
+  }) async {
+    try {
+      var query = _client.from('rental_bookings').select(_bookingSelect);
+      if (propertyId != null) query = query.eq('property_id', propertyId);
+      if (from != null) query = query.gte('check_out', _dateStr(from));
+      if (to != null) query = query.lte('check_in', _dateStr(to));
+      final data = await query.order('check_in', ascending: false).limit(500);
+      return Success((data as List).map((e) => _bookingFromMap(e as Map<String, dynamic>)).toList());
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar reservas: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalBooking>> getBooking(String id) async {
+    try {
+      final data = await _client.from('rental_bookings').select(_bookingSelect).eq('id', id).single();
+      return Success(_bookingFromMap(data));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao buscar reserva: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalBooking>> createBooking(RentalBookingInput input) async {
+    return _saveBooking(input);
+  }
+
+  @override
+  Future<Result<RentalBooking>> updateBooking(String id, RentalBookingInput input) async {
+    return _saveBooking(input, id: id);
+  }
+
+  Future<Result<RentalBooking>> _saveBooking(RentalBookingInput input, {String? id}) async {
+    try {
+      final row = {
+        'company_id': input.companyId,
+        'property_id': input.propertyId,
+        'unit_id': input.unitId,
+        'guest_party_id': input.guestPartyId,
+        'guest_name': input.guestName.trim(),
+        'guest_email': input.guestEmail?.trim(),
+        'guest_phone': input.guestPhone?.trim(),
+        'guests_count': input.guestsCount,
+        'channel': input.channel.value,
+        'status': input.status.value,
+        'check_in': _dateStr(input.checkIn),
+        'check_out': _dateStr(input.checkOut),
+        'nightly_rate': input.nightlyRate,
+        'total_amount': input.totalAmount,
+        'notes': input.notes?.trim(),
+      };
+      final dynamic data;
+      if (id == null) {
+        data = await _client.from('rental_bookings').insert(row).select(_bookingSelect).single();
+      } else {
+        data = await _client.from('rental_bookings').update(row).eq('id', id).select(_bookingSelect).single();
+      }
+      return Success(_bookingFromMap(data as Map<String, dynamic>));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao salvar reserva: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<RentalCharge>>> listCharges(RentalChargeListFilter filter) async {
+    try {
+      var query = _client.from('rental_charges').select(_chargeSelect);
+      if (filter.status != null) query = query.eq('status', filter.status!.value);
+      if (filter.chargeType != null) query = query.eq('charge_type', filter.chargeType!.value);
+      final data = await query.order('due_date', ascending: false).limit(300);
+      return Success((data as List).map((e) => _chargeFromMap(e as Map<String, dynamic>)).toList());
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar cobranças: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalCharge>> getCharge(String id) async {
+    try {
+      final data = await _client.from('rental_charges').select(_chargeSelect).eq('id', id).single();
+      return Success(_chargeFromMap(data));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao buscar cobrança: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalCharge>> createCharge(RentalChargeInput input) async {
+    return _saveCharge(input);
+  }
+
+  @override
+  Future<Result<RentalCharge>> updateCharge(String id, RentalChargeInput input) async {
+    return _saveCharge(input, id: id);
+  }
+
+  Future<Result<RentalCharge>> _saveCharge(RentalChargeInput input, {String? id}) async {
+    try {
+      final row = {
+        'company_id': input.companyId,
+        'lease_id': input.leaseId,
+        'booking_id': input.bookingId,
+        'party_id': input.partyId,
+        'charge_type': input.chargeType.value,
+        'status': input.status.value,
+        'description': input.description.trim(),
+        'amount': input.amount,
+        'due_date': input.dueDate != null ? _dateStr(input.dueDate!) : null,
+        'notes': input.notes?.trim(),
+      };
+      final dynamic data;
+      if (id == null) {
+        data = await _client.from('rental_charges').insert(row).select(_chargeSelect).single();
+      } else {
+        data = await _client.from('rental_charges').update(row).eq('id', id).select(_chargeSelect).single();
+      }
+      return Success(_chargeFromMap(data as Map<String, dynamic>));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao salvar cobrança: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalCharge>> markChargePaid(
+    String chargeId, {
+    bool syncFinancial = true,
+  }) async {
+    try {
+      await _client.from('rental_charges').update({
+        'status': RentalChargeStatus.paid.value,
+        'paid_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', chargeId);
+
+      if (syncFinancial) {
+        final sync = await syncChargeToFinancial(chargeId);
+        if (sync case Failure<String>(:final error)) return Failure(error);
+      }
+
+      return getCharge(chargeId);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao marcar cobrança: $e'));
+    }
+  }
+
+  @override
+  Future<Result<String>> syncChargeToFinancial(String chargeId) async {
+    try {
+      final chargeResult = await getCharge(chargeId);
+      RentalCharge? charge;
+      AppException? loadError;
+      chargeResult.when(
+        success: (c) => charge = c,
+        failure: (e) => loadError = e,
+      );
+      if (loadError != null) return Failure(loadError!);
+      final c = charge!;
+
+      if (c.financialRecordId != null) {
+        return Success(c.financialRecordId!);
+      }
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        return const Failure(AppAuthException('Usuário não autenticado.'));
+      }
+
+      String? condoId;
+      String? propertyId;
+
+      if (c.leaseId != null) {
+        final lease = await _client
+            .from('rental_leases')
+            .select('property_id')
+            .eq('id', c.leaseId!)
+            .maybeSingle();
+        propertyId = lease?['property_id'] as String?;
+      } else if (c.bookingId != null) {
+        final booking = await _client
+            .from('rental_bookings')
+            .select('property_id')
+            .eq('id', c.bookingId!)
+            .maybeSingle();
+        propertyId = booking?['property_id'] as String?;
+      }
+
+      if (propertyId != null) {
+        final prop = await _client
+            .from('rental_properties')
+            .select('condominium_id')
+            .eq('id', propertyId)
+            .maybeSingle();
+        condoId = prop?['condominium_id'] as String?;
+      }
+
+      final finRow = await _client.from('financial_records').insert({
+        'scope': condoId != null ? 'condominium' : 'management_company',
+        if (condoId != null) 'condominium_id': condoId,
+        if (propertyId != null) 'rental_property_id': propertyId,
+        'record_type': 'income',
+        'category': 'revenue',
+        'description': 'Locação: ${c.description}',
+        'amount': c.amount,
+        'tax_amount': 0,
+        'reference_date': _dateStr(c.dueDate ?? DateTime.now()),
+        'due_date': c.dueDate != null ? _dateStr(c.dueDate!) : null,
+        'paid_at': DateTime.now().toUtc().toIso8601String(),
+        'rental_charge_id': chargeId,
+        'created_by': userId,
+        'notes': c.notes,
+      }).select('id').single();
+
+      final finId = finRow['id'] as String;
+      await _client.from('rental_charges').update({
+        'financial_record_id': finId,
+      }).eq('id', chargeId);
+
+      return Success(finId);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao integrar financeiro: $e'));
+    }
+  }
+
+  static const _leaseSelect = '''
+    id, company_id, property_id, unit_id, lease_number, listing_mode, status,
+    start_date, end_date, monthly_rent, deposit_amount, due_day_of_month, notes,
+    rental_properties ( title ),
+    rental_parties!rental_leases_primary_tenant_party_id_fkey ( full_name )
+  ''';
+
+  static const _bookingSelect = '''
+    id, company_id, property_id, unit_id, booking_number, channel, status,
+    guest_name, guest_email, guest_phone, guests_count, check_in, check_out,
+    nightly_rate, total_amount, paid_amount, notes,
+    rental_properties ( title )
+  ''';
+
+  static const _chargeSelect = '''
+    id, company_id, lease_id, booking_id, party_id, charge_type, status,
+    description, amount, due_date, paid_at, financial_record_id, notes,
+    rental_parties ( full_name ),
+    rental_leases ( rental_properties ( title ) ),
+    rental_bookings ( rental_properties ( title ) )
+  ''';
+
+  Map<String, dynamic> _propertyPayload(RentalPropertyInput input) => {
+        'company_id': input.companyId,
+        'title': input.title.trim(),
+        'property_type': input.propertyType.value,
+        'listing_mode': input.listingMode.value,
+        'code': input.code?.trim(),
+        'description': input.description?.trim(),
+        'condominium_id': input.condominiumId,
+        'owner_party_id': input.ownerPartyId,
+        'address_street': input.addressStreet?.trim(),
+        'address_number': input.addressNumber?.trim(),
+        'address_neighborhood': input.addressNeighborhood?.trim(),
+        'address_city': input.addressCity?.trim(),
+        'address_state': input.addressState?.trim(),
+        'address_zip': input.addressZip?.trim(),
+        'area_sqm': input.areaSqm,
+        'bedrooms': input.bedrooms,
+        'bathrooms': input.bathrooms,
+        'max_guests': input.maxGuests,
+        'base_rent_amount': input.baseRentAmount,
+        'base_daily_rate': input.baseDailyRate,
+        'deposit_amount': input.depositAmount,
+        'status': input.status,
+      };
+
+  RentalProperty _propertyFromMap(Map<String, dynamic> map) {
+    final condo = map['condominiums'] as Map<String, dynamic>?;
+    return RentalProperty(
+      id: map['id'] as String,
+      companyId: map['company_id'] as String,
+      condominiumId: map['condominium_id'] as String?,
+      condominiumName: condo?['name'] as String?,
+      ownerPartyId: map['owner_party_id'] as String?,
+      propertyType: RentalPropertyType.fromValue(map['property_type'] as String),
+      listingMode: RentalListingMode.fromValue(map['listing_mode'] as String),
+      code: map['code'] as String?,
+      title: map['title'] as String,
+      description: map['description'] as String?,
+      addressStreet: map['address_street'] as String?,
+      addressNumber: map['address_number'] as String?,
+      addressNeighborhood: map['address_neighborhood'] as String?,
+      addressCity: map['address_city'] as String?,
+      addressState: map['address_state'] as String?,
+      addressZip: map['address_zip'] as String?,
+      areaSqm: _toDouble(map['area_sqm']),
+      bedrooms: map['bedrooms'] as int?,
+      bathrooms: map['bathrooms'] as int?,
+      maxGuests: map['max_guests'] as int?,
+      baseRentAmount: _toDouble(map['base_rent_amount']),
+      baseDailyRate: _toDouble(map['base_daily_rate']),
+      depositAmount: _toDouble(map['deposit_amount']),
+      status: map['status'] as String? ?? 'active',
+    );
+  }
+
+  RentalParty _partyFromMap(Map<String, dynamic> map) => RentalParty(
+        id: map['id'] as String,
+        companyId: map['company_id'] as String,
+        fullName: map['full_name'] as String,
+        email: map['email'] as String?,
+        phone: map['phone'] as String?,
+        documentNumber: map['document_number'] as String?,
+        notes: map['notes'] as String?,
+        status: map['status'] as String? ?? 'active',
+      );
+
+  RentalLease _leaseFromMap(Map<String, dynamic> map) {
+    final prop = map['rental_properties'] as Map<String, dynamic>?;
+    final tenant = map['rental_parties'] as Map<String, dynamic>?;
+    return RentalLease(
+      id: map['id'] as String,
+      companyId: map['company_id'] as String,
+      propertyId: map['property_id'] as String,
+      propertyTitle: prop?['title'] as String? ?? '—',
+      unitId: map['unit_id'] as String?,
+      tenantName: tenant?['full_name'] as String?,
+      leaseNumber: map['lease_number'] as String?,
+      listingMode: RentalListingMode.fromValue(map['listing_mode'] as String),
+      status: RentalLeaseStatus.fromValue(map['status'] as String),
+      startDate: DateTime.parse(map['start_date'] as String),
+      endDate: map['end_date'] != null ? DateTime.parse(map['end_date'] as String) : null,
+      monthlyRent: _toDouble(map['monthly_rent']) ?? 0,
+      depositAmount: _toDouble(map['deposit_amount']),
+      dueDayOfMonth: map['due_day_of_month'] as int?,
+      notes: map['notes'] as String?,
+      primaryTenantPartyId: map['primary_tenant_party_id'] as String?,
+    );
+  }
+
+  RentalBooking _bookingFromMap(Map<String, dynamic> map) {
+    final prop = map['rental_properties'] as Map<String, dynamic>?;
+    return RentalBooking(
+      id: map['id'] as String,
+      companyId: map['company_id'] as String,
+      propertyId: map['property_id'] as String,
+      propertyTitle: prop?['title'] as String? ?? '—',
+      unitId: map['unit_id'] as String?,
+      bookingNumber: map['booking_number'] as String?,
+      channel: RentalBookingChannel.fromValue(map['channel'] as String),
+      status: RentalBookingStatus.fromValue(map['status'] as String),
+      guestName: map['guest_name'] as String,
+      guestEmail: map['guest_email'] as String?,
+      guestPhone: map['guest_phone'] as String?,
+      guestsCount: map['guests_count'] as int? ?? 1,
+      checkIn: DateTime.parse(map['check_in'] as String),
+      checkOut: DateTime.parse(map['check_out'] as String),
+      nightlyRate: _toDouble(map['nightly_rate']),
+      totalAmount: _toDouble(map['total_amount']),
+      paidAmount: _toDouble(map['paid_amount']),
+      notes: map['notes'] as String?,
+    );
+  }
+
+  RentalCharge _chargeFromMap(Map<String, dynamic> map) {
+    final party = map['rental_parties'] as Map<String, dynamic>?;
+    String? propTitle;
+    final lease = map['rental_leases'] as Map<String, dynamic>?;
+    final booking = map['rental_bookings'] as Map<String, dynamic>?;
+    if (lease != null) {
+      final p = lease['rental_properties'] as Map<String, dynamic>?;
+      propTitle = p?['title'] as String?;
+    } else if (booking != null) {
+      final p = booking['rental_properties'] as Map<String, dynamic>?;
+      propTitle = p?['title'] as String?;
+    }
+    return RentalCharge(
+      id: map['id'] as String,
+      companyId: map['company_id'] as String,
+      leaseId: map['lease_id'] as String?,
+      bookingId: map['booking_id'] as String?,
+      partyId: map['party_id'] as String?,
+      partyName: party?['full_name'] as String?,
+      propertyTitle: propTitle,
+      chargeType: RentalChargeType.fromValue(map['charge_type'] as String),
+      status: RentalChargeStatus.fromValue(map['status'] as String),
+      description: map['description'] as String,
+      amount: _toDouble(map['amount']) ?? 0,
+      dueDate: map['due_date'] != null ? DateTime.parse(map['due_date'] as String) : null,
+      paidAt: map['paid_at'] != null ? DateTime.parse(map['paid_at'] as String) : null,
+      financialRecordId: map['financial_record_id'] as String?,
+      notes: map['notes'] as String?,
+    );
+  }
+
+  String _dateStr(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  @override
+  Future<Result<List<RentalPropertyPnl>>> propertyPnlReport({
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    try {
+      final params = <String, dynamic>{};
+      if (from != null) params['p_from'] = _dateStr(from);
+      if (to != null) params['p_to'] = _dateStr(to);
+
+      final data = await _client.rpc('rental_property_pnl_report', params: params);
+      final rows = (data as List).map((e) {
+        final map = e as Map<String, dynamic>;
+        return RentalPropertyPnl(
+          propertyId: map['property_id'] as String,
+          propertyTitle: map['property_title'] as String,
+          condominiumName: map['condominium_name'] as String?,
+          rentalRevenue: _toDouble(map['rental_revenue']) ?? 0,
+          maintenanceCost: _toDouble(map['maintenance_cost']) ?? 0,
+          ticketCount: (map['ticket_count'] as num?)?.toInt() ?? 0,
+          workOrderCount: (map['work_order_count'] as num?)?.toInt() ?? 0,
+        );
+      }).toList();
+      return Success(rows);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao carregar relatório: $e'));
+    }
+  }
+
+  AppException _mapError(PostgrestException e) {
+    if (e.code == '42501' || e.message.contains('permission')) {
+      return PermissionException(e.message);
+    }
+    return NetworkException(e.message);
+  }
+}

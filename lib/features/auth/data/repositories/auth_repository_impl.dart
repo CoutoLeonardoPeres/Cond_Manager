@@ -122,6 +122,19 @@ class AuthRepositoryImpl implements AuthRepository {
             : <String>[];
       }
 
+      if (companyId != null) {
+        final modules = await _client
+            .from('company_modules')
+            .select('module')
+            .eq('company_id', companyId)
+            .eq('status', 'active');
+        map['enabled_modules'] = (modules as List<dynamic>)
+            .map((m) => (m as Map<String, dynamic>)['module'] as String)
+            .toList();
+      } else {
+        map['enabled_modules'] = ['maintenance'];
+      }
+
       return Success(UserProfileModel.fromJson(map).toEntity());
     } catch (e) {
       return Failure(NetworkException('Erro ao carregar perfil: $e'));

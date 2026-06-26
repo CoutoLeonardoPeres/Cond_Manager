@@ -8,7 +8,10 @@ abstract interface class CondominiumRepository {
 
   Future<Result<Condominium>> getById(String id);
 
-  Future<Result<Condominium>> create(CondominiumCreateInput input);
+  Future<Result<Condominium>> create(
+    CondominiumCreateInput input, {
+    String? managementCompanyId,
+  });
 
   Future<Result<Condominium>> update(String id, CondominiumCreateInput input);
 }

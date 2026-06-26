@@ -2,12 +2,22 @@ import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/features/access_logs/domain/entities/access_session_log.dart';
 import 'package:cond_manager/features/access_logs/presentation/providers/access_log_providers.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
+import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
+import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/features/users/domain/entities/organization_user.dart';
 import 'package:cond_manager/features/users/presentation/providers/users_providers.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
+class _AllCompaniesOption {
+  const _AllCompaniesOption();
+}
+
+class _AllCondominiumsOption {
+  const _AllCondominiumsOption();
+}
 
 class AccessLogsPage extends ConsumerWidget {
   const AccessLogsPage({super.key});
@@ -20,7 +30,7 @@ class AccessLogsPage extends ConsumerWidget {
     if (!perms.canViewAccessLogs) {
       return const Center(
         child: Text(
-          'Somente administrador ou gerente pode consultar o log de acesso.',
+          'Somente administrador ou gerente da empresa pode consultar o log de acesso.',
           style: TextStyle(color: ClayTokens.textSecondary),
         ),
       );
@@ -30,7 +40,18 @@ class AccessLogsPage extends ConsumerWidget {
     final summaryAsync = ref.watch(accessLogSummaryProvider);
     final filter = ref.watch(accessLogFilterProvider);
     final companiesAsync = ref.watch(managementCompaniesProvider);
+    final condosAsync = ref.watch(accessibleCondominiumsProvider);
     final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+
+    if (perms.isOrganizationManager && !perms.isAdmin && profile?.companyId != null) {
+      if (filter.companyId != profile!.companyId) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(accessLogFilterProvider.notifier).state = filter.copyWith(
+                companyId: profile.companyId,
+              );
+        });
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -47,9 +68,11 @@ class AccessLogsPage extends ConsumerWidget {
                     ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Tempo de uso, data/hora e contexto por sessão de acesso.',
-                style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
+              Text(
+                perms.isAdmin
+                    ? 'Todos os acessos de todas as empresas gestoras.'
+                    : 'Acessos da sua empresa gestora e condomínios vinculados.',
+                style: const TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 12),
               summaryAsync.when(
@@ -73,34 +96,90 @@ class AccessLogsPage extends ConsumerWidget {
                 data: (companies) {
                   if (companies.isEmpty) return const SizedBox.shrink();
 
+                  if (perms.isAdmin) {
+                    final items = <Object>[const _AllCompaniesOption(), ...companies];
+                    final selected = filter.companyId == null
+                        ? const _AllCompaniesOption()
+                        : companies.firstWhere(
+                            (c) => c.id == filter.companyId,
+                            orElse: () => companies.first,
+                          );
+
+                    return ClayDropdownField<Object>(
+                      label: 'Empresa gestora',
+                      value: selected,
+                      items: items,
+                      itemLabel: (item) => switch (item) {
+                        _AllCompaniesOption() => 'Todas as empresas',
+                        ManagementCompany c => c.displayName,
+                        _ => '—',
+                      },
+                      onChanged: (v) {
+                        if (v == null) return;
+                        ref.read(accessLogFilterProvider.notifier).state =
+                            filter.copyWith(
+                          companyId: v is ManagementCompany ? v.id : null,
+                          clearCompany: v is _AllCompaniesOption,
+                          clearCondominium: true,
+                        );
+                      },
+                    );
+                  }
+
                   final targetId = filter.companyId ?? profile?.companyId;
                   final selected = companies.firstWhere(
                     (c) => c.id == targetId,
                     orElse: () => companies.first,
                   );
-                  if (filter.companyId == null) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      ref.read(accessLogFilterProvider.notifier).state =
-                          filter.copyWith(companyId: selected.id);
-                    });
-                  }
+
                   return ClayDropdownField<ManagementCompany>(
                     label: 'Empresa gestora',
                     value: selected,
-                    items: companies,
+                    items: [selected],
                     itemLabel: (c) => c.displayName,
-                    onChanged: perms.isAdmin
-                        ? (v) {
-                            if (v == null) return;
-                            ref.read(accessLogFilterProvider.notifier).state =
-                                filter.copyWith(companyId: v.id);
-                          }
-                        : null,
+                    onChanged: null,
                   );
                 },
                 loading: () => const LinearProgressIndicator(),
                 error: (_, _) => const SizedBox.shrink(),
               ),
+              if (!perms.isAdmin) ...[
+                const SizedBox(height: 12),
+                condosAsync.when(
+                  data: (condos) {
+                    if (condos.isEmpty) return const SizedBox.shrink();
+
+                    final items = <Object>[const _AllCondominiumsOption(), ...condos];
+                    final selected = filter.condominiumId == null
+                        ? const _AllCondominiumsOption()
+                        : condos.firstWhere(
+                            (c) => c.id == filter.condominiumId,
+                            orElse: () => condos.first,
+                          );
+
+                    return ClayDropdownField<Object>(
+                      label: 'Condomínio',
+                      value: selected,
+                      items: items,
+                      itemLabel: (item) => switch (item) {
+                        _AllCondominiumsOption() => 'Todos os condomínios',
+                        Condominium c => c.name,
+                        _ => '—',
+                      },
+                      onChanged: (v) {
+                        if (v == null) return;
+                        ref.read(accessLogFilterProvider.notifier).state =
+                            filter.copyWith(
+                          condominiumId: v is Condominium ? v.id : null,
+                          clearCondominium: v is _AllCondominiumsOption,
+                        );
+                      },
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [

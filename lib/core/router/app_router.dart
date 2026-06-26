@@ -1,3 +1,5 @@
+import 'package:cond_manager/core/modules/app_module_providers.dart';
+import 'package:cond_manager/core/modules/company_module_access.dart';
 import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/core/providers/supabase_provider.dart';
 import 'package:cond_manager/features/auth/presentation/pages/accept_invite_page.dart';
@@ -5,6 +7,7 @@ import 'package:cond_manager/features/auth/presentation/pages/forgot_password_pa
 import 'package:cond_manager/features/auth/presentation/pages/login_page.dart';
 import 'package:cond_manager/features/auth/presentation/pages/register_page.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
+import 'package:cond_manager/features/condominiums/presentation/condominium_route_prefix.dart';
 import 'package:cond_manager/features/condominiums/presentation/pages/condominium_detail_page.dart';
 import 'package:cond_manager/features/condominiums/presentation/pages/condominium_form_page.dart';
 import 'package:cond_manager/features/condominiums/presentation/pages/condominiums_list_page.dart';
@@ -32,6 +35,20 @@ import 'package:cond_manager/features/financial/presentation/pages/financial_pag
 import 'package:cond_manager/shared/domain/enums/financial_scope.dart';
 import 'package:cond_manager/features/users/presentation/pages/user_form_page.dart';
 import 'package:cond_manager/features/users/presentation/pages/users_page.dart';
+import 'package:cond_manager/features/modules/presentation/pages/company_modules_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_booking_form_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_bookings_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_calendar_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_charge_form_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_charges_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_dashboard_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_lease_form_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_leases_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_parties_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_party_form_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_properties_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_property_form_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_property_report_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -58,7 +75,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isLoggedIn && !isAuthRoute) {
         final profile = ref.read(currentProfileProvider).valueOrNull;
         if (profile != null && !profile.permissions.canAccessRoute(state.matchedLocation)) {
-          return profile.permissions.homeRoute;
+          final active =
+              ref.read(activeAppModuleProvider) ?? profile.modules.defaultModule;
+          return profile.permissions.homeRouteForModule(active);
         }
       }
       return null;
@@ -257,6 +276,118 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/access-logs',
             builder: (_, _) => const AccessLogsPage(),
           ),
+          GoRoute(
+            path: '/rental',
+            builder: (_, _) => const RentalDashboardPage(),
+          ),
+          GoRoute(
+            path: '/rental/properties/new',
+            builder: (_, _) => const RentalPropertyFormPage(),
+          ),
+          GoRoute(
+            path: '/rental/properties/:id/edit',
+            builder: (_, state) => RentalPropertyFormPage(
+              propertyId: state.pathParameters['id'],
+            ),
+          ),
+          GoRoute(
+            path: '/rental/properties',
+            builder: (_, _) => const RentalPropertiesPage(),
+          ),
+          GoRoute(
+            path: '/rental/leases/new',
+            builder: (_, _) => const RentalLeaseFormPage(),
+          ),
+          GoRoute(
+            path: '/rental/leases/:id/edit',
+            builder: (_, state) => RentalLeaseFormPage(
+              leaseId: state.pathParameters['id'],
+            ),
+          ),
+          GoRoute(
+            path: '/rental/leases',
+            builder: (_, _) => const RentalLeasesPage(),
+          ),
+          GoRoute(
+            path: '/rental/bookings/new',
+            builder: (_, _) => const RentalBookingFormPage(),
+          ),
+          GoRoute(
+            path: '/rental/bookings/:id/edit',
+            builder: (_, state) => RentalBookingFormPage(
+              bookingId: state.pathParameters['id'],
+            ),
+          ),
+          GoRoute(
+            path: '/rental/bookings',
+            builder: (_, _) => const RentalBookingsPage(),
+          ),
+          GoRoute(
+            path: '/rental/parties/new',
+            builder: (_, _) => const RentalPartyFormPage(),
+          ),
+          GoRoute(
+            path: '/rental/parties/:id/edit',
+            builder: (_, state) => RentalPartyFormPage(
+              partyId: state.pathParameters['id'],
+            ),
+          ),
+          GoRoute(
+            path: '/rental/parties',
+            builder: (_, _) => const RentalPartiesPage(),
+          ),
+          GoRoute(
+            path: '/rental/charges/new',
+            builder: (_, _) => const RentalChargeFormPage(),
+          ),
+          GoRoute(
+            path: '/rental/charges/:id/edit',
+            builder: (_, state) => RentalChargeFormPage(
+              chargeId: state.pathParameters['id'],
+            ),
+          ),
+          GoRoute(
+            path: '/rental/charges',
+            builder: (_, _) => const RentalChargesPage(),
+          ),
+          GoRoute(
+            path: '/rental/calendar',
+            builder: (_, _) => const RentalCalendarPage(),
+          ),
+          GoRoute(
+            path: '/rental/condominiums/new',
+            builder: (_, _) => const CondominiumFormPage(
+              routePrefix: CondominiumRoutePrefix.rental,
+            ),
+          ),
+          GoRoute(
+            path: '/rental/condominiums/:id/edit',
+            builder: (_, state) => CondominiumFormPage(
+              condominiumId: state.pathParameters['id'],
+              routePrefix: CondominiumRoutePrefix.rental,
+            ),
+          ),
+          GoRoute(
+            path: '/rental/condominiums/:id',
+            builder: (_, state) => CondominiumDetailPage(
+              condominiumId: state.pathParameters['id']!,
+              routePrefix: CondominiumRoutePrefix.rental,
+            ),
+          ),
+          GoRoute(
+            path: '/rental/condominiums',
+            builder: (_, _) => const CondominiumsListPage(
+              routePrefix: CondominiumRoutePrefix.rental,
+            ),
+          ),
+          GoRoute(
+            path: '/rental/reports',
+            builder: (_, _) => const RentalPropertyReportPage(),
+          ),
+          GoRoute(
+            path: '/admin/modules',
+            builder: (_, _) => const CompanyModulesPage(),
+          ),
         ],
       ),
     ],
@@ -267,6 +398,7 @@ final _routerRefreshProvider = Provider<_RouterRefresh>((ref) {
   final notifier = _RouterRefresh();
   ref.listen(authStateProvider, (_, _) => notifier.refresh());
   ref.listen(currentProfileProvider, (_, _) => notifier.refresh());
+  ref.listen(activeAppModuleProvider, (_, _) => notifier.refresh());
   ref.onDispose(notifier.dispose);
   return notifier;
 });

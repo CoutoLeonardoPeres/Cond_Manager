@@ -2,6 +2,8 @@ import 'package:cond_manager/core/router/navigation_helpers.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_property_link_field.dart';
 import 'package:cond_manager/features/tickets/domain/entities/ticket.dart';
 import 'package:cond_manager/features/tickets/presentation/providers/ticket_providers.dart';
 import 'package:cond_manager/shared/domain/enums/location_type.dart';
@@ -33,6 +35,7 @@ class _TicketFormPageState extends ConsumerState<TicketFormPage> {
   PriorityLevel _priority = PriorityLevel.medium;
   UnitOption? _unit;
   CommonAreaOption? _commonArea;
+  RentalProperty? _rentalProperty;
   final List<PendingTicketFile> _pendingFiles = [];
   bool _isLoading = false;
   String? _error;
@@ -95,6 +98,7 @@ class _TicketFormPageState extends ConsumerState<TicketFormPage> {
       unitId: _locationType.requiresUnit ? _unit?.id : null,
       commonAreaId: _locationType == LocationType.commonArea ? _commonArea?.id : null,
       locationDescription: _locationDescController.text,
+      rentalPropertyId: _rentalProperty?.id,
       serviceType: _serviceType,
       priority: _priority,
       title: _titleController.text,
@@ -203,6 +207,7 @@ class _TicketFormPageState extends ConsumerState<TicketFormPage> {
         _condominium = c;
         _unit = null;
         _commonArea = null;
+        _rentalProperty = null;
       }),
     );
   }
@@ -217,6 +222,14 @@ class _TicketFormPageState extends ConsumerState<TicketFormPage> {
     final items = <FormGridField>[
       FormGridField(
         child: _condominiumField(condos, isPlatformAdmin, loading: loadingCondos),
+      ),
+      FormGridField(
+        span: 2,
+        child: RentalPropertyLinkField(
+          condominiumId: _condominium?.id,
+          value: _rentalProperty,
+          onChanged: (p) => setState(() => _rentalProperty = p),
+        ),
       ),
       FormGridField(
         child: ClayDropdownField<LocationType>(

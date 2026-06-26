@@ -93,11 +93,17 @@ class CondominiumRepositoryImpl implements CondominiumRepository {
   }
 
   @override
-  Future<Result<Condominium>> create(CondominiumCreateInput input) async {
+  Future<Result<Condominium>> create(
+    CondominiumCreateInput input, {
+    String? managementCompanyId,
+  }) async {
     try {
       final userId = _client.auth.currentUser?.id;
       final model = CondominiumModel.fromCreateInput(input);
-      final payload = model.toInsertJson(createdBy: userId);
+      final payload = model.toInsertJson(
+        createdBy: userId,
+        managementCompanyId: managementCompanyId,
+      );
 
       _putIfNotEmpty(payload, 'complement', input.complement);
       _putIfNotEmpty(payload, 'manager_number', input.managerNumber);
@@ -137,7 +143,7 @@ class CondominiumRepositoryImpl implements CondominiumRepository {
     final msg = e.message.toLowerCase();
     if (msg.contains('permission') || e.code == '42501') {
       return const PermissionException(
-        'Sem permissão. Apenas administrador da plataforma pode cadastrar condomínios.',
+        'Sem permissão para cadastrar condomínios.',
       );
     }
     if (msg.contains('duplicate') || e.code == '23505') {

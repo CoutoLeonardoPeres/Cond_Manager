@@ -2,6 +2,7 @@ import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/core/router/navigation_helpers.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
+import 'package:cond_manager/features/condominiums/presentation/condominium_route_prefix.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
@@ -9,9 +10,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class CondominiumFormPage extends ConsumerStatefulWidget {
-  const CondominiumFormPage({super.key, this.condominiumId});
+  const CondominiumFormPage({
+    super.key,
+    this.condominiumId,
+    this.routePrefix = CondominiumRoutePrefix.maintenance,
+  });
 
   final String? condominiumId;
+  final CondominiumRoutePrefix routePrefix;
 
   bool get isEditing => condominiumId != null;
 
@@ -78,10 +84,10 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
 
   void _goBack(BuildContext context) {
     if (widget.isEditing) {
-      context.go('/condominiums/${widget.condominiumId}');
+      context.go(widget.routePrefix.detail(widget.condominiumId!));
       return;
     }
-    context.go(resolveReturnPath(context, fallback: '/condominiums'));
+    context.go(resolveReturnPath(context, fallback: widget.routePrefix.list));
   }
 
   void _fillFromCondominium(Condominium c) {
@@ -187,10 +193,14 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
 
     final input = _buildInput();
     final repo = ref.read(condominiumRepositoryProvider);
+    final companyId = ref.read(currentProfileProvider).value?.companyId;
 
     final result = widget.isEditing
         ? await repo.update(widget.condominiumId!, input)
-        : await repo.create(input);
+        : await repo.create(
+            input,
+            managementCompanyId: companyId,
+          );
 
     if (!mounted) return;
 
@@ -200,7 +210,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
         ref.invalidate(accessibleCondominiumsProvider);
         if (widget.isEditing) {
           ref.invalidate(condominiumDetailProvider(widget.condominiumId!));
-          context.go('/condominiums/${widget.condominiumId}');
+          context.go(widget.routePrefix.detail(widget.condominiumId!));
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Condomínio atualizado com sucesso!'),
@@ -209,7 +219,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
           );
         } else {
           ref.invalidate(currentProfileProvider);
-          final returnPath = resolveReturnPath(context, fallback: '/condominiums');
+          final returnPath = resolveReturnPath(context, fallback: widget.routePrefix.list);
           context.go(returnPath);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -229,7 +239,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
   Widget build(BuildContext context) {
     final profile = ref.watch(currentProfileProvider).value;
     final perms = profile.permissions;
-    final canCreate = profile?.isPlatformAdmin == true;
+    final canCreate = perms.canCreateCondominium;
     final canEdit = widget.isEditing &&
         widget.condominiumId != null &&
         perms.canEditCondominium(widget.condominiumId!);
@@ -264,7 +274,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
 
     if (!canCreate) {
       return _LockedView(
-        message: 'Apenas administrador da plataforma pode cadastrar condomínios.',
+        message: 'Apenas administrador ou gerente da empresa podem cadastrar condomínios.',
         onBack: () => _goBack(context),
       );
     }

@@ -1,6 +1,8 @@
 import 'package:cond_manager/core/router/navigation_helpers.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_property_link_field.dart';
 import 'package:cond_manager/features/tickets/domain/entities/ticket.dart';
 import 'package:cond_manager/features/tickets/presentation/providers/ticket_providers.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
@@ -49,6 +51,7 @@ class _WorkOrderFormPageState extends ConsumerState<WorkOrderFormPage> {
   ProviderPickerOption? _provider;
   UnitOption? _unit;
   CommonAreaOption? _commonArea;
+  RentalProperty? _rentalProperty;
   String? _pendingUnitId;
   String? _pendingCommonAreaId;
   String? _requesterId;
@@ -184,6 +187,7 @@ class _WorkOrderFormPageState extends ConsumerState<WorkOrderFormPage> {
       internalResponsibleId:
           _assigneeType == WorkOrderAssigneeType.internal ? _internalStaff?.profileId : null,
       providerId: _assigneeType == WorkOrderAssigneeType.provider ? _provider?.id : null,
+      rentalPropertyId: _rentalProperty?.id,
     );
 
     final result = await ref.read(workOrderRepositoryProvider).create(input);
@@ -366,6 +370,14 @@ class _WorkOrderFormPageState extends ConsumerState<WorkOrderFormPage> {
                       child: condosAsync.isLoading
                           ? const LinearProgressIndicator()
                           : _condominiumDropdown(condos),
+                    ),
+                    FormGridField(
+                      span: 2,
+                      child: RentalPropertyLinkField(
+                        condominiumId: _condominium?.id,
+                        value: _rentalProperty,
+                        onChanged: (p) => setState(() => _rentalProperty = p),
+                      ),
                     ),
                     FormGridField(
                       child: _ticketLinkLocked && _linkedTicket != null
@@ -629,6 +641,7 @@ class _WorkOrderFormPageState extends ConsumerState<WorkOrderFormPage> {
         }
         _unit = null;
         _commonArea = null;
+        _rentalProperty = null;
       }),
     );
   }

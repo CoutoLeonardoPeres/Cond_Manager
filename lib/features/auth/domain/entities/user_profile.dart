@@ -1,3 +1,4 @@
+import 'package:cond_manager/shared/domain/enums/app_module.dart';
 import 'package:cond_manager/shared/domain/enums/organization_role.dart';
 import 'package:cond_manager/shared/domain/enums/user_role.dart';
 import 'package:equatable/equatable.dart';
@@ -15,6 +16,7 @@ class UserProfile extends Equatable {
     this.companyMembership,
     this.condominiumRoles = const [],
     this.accessibleCondominiumIds = const [],
+    this.enabledModules = const [AppModule.maintenance],
   });
 
   final String id;
@@ -28,6 +30,7 @@ class UserProfile extends Equatable {
   final CompanyMembership? companyMembership;
   final List<CondominiumRole> condominiumRoles;
   final List<String> accessibleCondominiumIds;
+  final List<AppModule> enabledModules;
 
   OrganizationRole? get primaryOrganizationRole => companyMembership?.role;
 
@@ -47,7 +50,7 @@ class UserProfile extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, email, fullName, isPlatformAdmin, companyMembership, condominiumRoles];
+  List<Object?> get props => [id, email, fullName, isPlatformAdmin, companyMembership, condominiumRoles, enabledModules];
 }
 
 class CompanyMembership extends Equatable {

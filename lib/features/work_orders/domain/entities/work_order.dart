@@ -103,6 +103,7 @@ class WorkOrderCreateInput extends Equatable {
     this.commonAreaId,
     this.dueDate,
     this.requesterId,
+    this.rentalPropertyId,
   });
 
   final String condominiumId;
@@ -119,6 +120,7 @@ class WorkOrderCreateInput extends Equatable {
   final String? providerId;
   final DateTime? dueDate;
   final String? requesterId;
+  final String? rentalPropertyId;
 
   @override
   List<Object?> get props => [condominiumId, title, ticketId];

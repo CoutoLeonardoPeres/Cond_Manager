@@ -30,6 +30,8 @@ class Ticket extends Equatable {
     this.condominiumName,
     this.requesterName,
     this.assigneeName,
+    this.rentalPropertyId,
+    this.rentalPropertyTitle,
   });
 
   final String id;
@@ -56,6 +58,8 @@ class Ticket extends Equatable {
   final String? condominiumName;
   final String? requesterName;
   final String? assigneeName;
+  final String? rentalPropertyId;
+  final String? rentalPropertyTitle;
 
   String get displayNumber => 'CH-${ticketNumber.toString().padLeft(5, '0')}';
 
@@ -80,6 +84,7 @@ class TicketCreateInput extends Equatable {
     this.unitId,
     this.commonAreaId,
     this.locationDescription,
+    this.rentalPropertyId,
   });
 
   final String condominiumId;
@@ -87,6 +92,7 @@ class TicketCreateInput extends Equatable {
   final String? unitId;
   final String? commonAreaId;
   final String? locationDescription;
+  final String? rentalPropertyId;
   final ServiceType serviceType;
   final PriorityLevel priority;
   final String title;

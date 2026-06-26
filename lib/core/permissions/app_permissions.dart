@@ -1,4 +1,6 @@
+import 'package:cond_manager/core/modules/company_module_access.dart';
 import 'package:cond_manager/features/auth/domain/entities/user_profile.dart';
+import 'package:cond_manager/shared/domain/enums/app_module.dart';
 import 'package:cond_manager/shared/domain/enums/organization_role.dart';
 import 'package:cond_manager/shared/domain/enums/user_role.dart';
 
@@ -16,6 +18,10 @@ class AppPermissions {
   const AppPermissions(this.profile);
 
   final UserProfile? profile;
+
+  CompanyModuleAccess get moduleAccess => CompanyModuleAccess(profile);
+
+  bool hasModule(AppModule module) => moduleAccess.hasModule(module);
 
   AppAccessTier get tier {
     if (profile == null) return AppAccessTier.client;
@@ -59,9 +65,21 @@ class AppPermissions {
 
   bool get canManageUsers => isAdmin || isManager;
 
-  bool get canViewAccessLogs => isAdmin || isManager;
+  bool get isOrganizationManager => tier == AppAccessTier.manager;
+
+  bool get canViewAccessLogs => isAdmin || isOrganizationManager;
 
   bool get canManageCondominiumsGlobal => isAdmin;
+
+  bool get canManageCompanyModules => isAdmin;
+
+  bool get canCreateCondominium => isAdmin || isManager;
+
+  bool get hasMaintenanceAndRental =>
+      hasModule(AppModule.maintenance) && hasModule(AppModule.rental);
+
+  bool get canManageRental =>
+      hasModule(AppModule.rental) && (isAdmin || isManager || isAnalyst);
 
   bool canEditCondominium(String condominiumId) {
     if (isAdmin) return true;
@@ -82,12 +100,21 @@ class AppPermissions {
   }
 
   bool canAccessRoute(String path) {
+    if (path.startsWith('/admin')) {
+      return isAdmin;
+    }
+    if (path.startsWith('/rental')) {
+      return _canAccessRentalRoute(path);
+    }
+    if (!hasModule(AppModule.maintenance)) return false;
+    return _canAccessMaintenanceRoute(path);
+  }
+
+  bool _canAccessMaintenanceRoute(String path) {
     if (isAdmin || isManager || isAnalyst || tier == AppAccessTier.legacyStaff) {
       if (path.startsWith('/users') && !canManageUsers) return false;
       if (path.startsWith('/access-logs') && !canViewAccessLogs) return false;
-      if (path.startsWith('/condominiums/new') && !canManageCondominiumsGlobal) {
-        return isManager;
-      }
+      if (path.startsWith('/condominiums/new') && !canCreateCondominium) return false;
       return true;
     }
     if (isFieldTeam) {
@@ -101,7 +128,28 @@ class AppPermissions {
     return false;
   }
 
-  List<String> get allowedNavPaths {
+  bool _canAccessRentalRoute(String path) {
+    if (!hasModule(AppModule.rental)) return false;
+    if (path.startsWith('/rental/condominiums/new') && !canCreateCondominium) return false;
+    if (path.startsWith('/rental/reports') && !canManageRental) return false;
+    if (isAdmin || isManager || isAnalyst) return true;
+    if (isFieldTeam) {
+      return path == '/rental' ||
+          path.startsWith('/rental/bookings') ||
+          path.startsWith('/rental/properties');
+    }
+    return false;
+  }
+
+  List<String> allowedNavPathsForModule(AppModule module) {
+    return switch (module) {
+      AppModule.maintenance => _maintenanceNavPaths,
+      AppModule.rental => _rentalNavPaths,
+    };
+  }
+
+  List<String> get _maintenanceNavPaths {
+    if (!hasModule(AppModule.maintenance)) return const [];
     if (isAdmin || isManager || isAnalyst || tier == AppAccessTier.legacyStaff) {
       final paths = [
         '/',
@@ -115,6 +163,7 @@ class AppPermissions {
       ];
       if (canManageUsers) paths.add('/users');
       if (canViewAccessLogs) paths.add('/access-logs');
+      if (canManageCompanyModules) paths.add('/admin/modules');
       return paths;
     }
     if (isFieldTeam) return ['/', '/tickets', '/work-orders'];
@@ -122,10 +171,34 @@ class AppPermissions {
     return ['/'];
   }
 
-  String get homeRoute {
+  List<String> get _rentalNavPaths {
+    if (!hasModule(AppModule.rental)) return const [];
+    if (isAdmin || isManager || isAnalyst) {
+      return [
+        '/rental',
+        '/rental/condominiums',
+        '/rental/properties',
+        '/rental/leases',
+        '/rental/bookings',
+        '/rental/calendar',
+        '/rental/parties',
+        '/rental/charges',
+        '/rental/reports',
+      ];
+    }
+    if (isFieldTeam) {
+      return ['/rental', '/rental/properties', '/rental/bookings'];
+    }
+    return const [];
+  }
+
+  String homeRouteForModule(AppModule module) {
+    if (module == AppModule.rental) return '/rental';
     if (isClient || isFieldTeam) return '/tickets';
     return '/';
   }
+
+  String get homeRoute => homeRouteForModule(moduleAccess.defaultModule);
 
   bool canManageInCondominium(String condominiumId) {
     if (isAdmin || isManager) return true;

@@ -1,4 +1,5 @@
 import 'package:cond_manager/features/auth/domain/entities/user_profile.dart';
+import 'package:cond_manager/shared/domain/enums/app_module.dart';
 import 'package:cond_manager/shared/domain/enums/organization_role.dart';
 import 'package:cond_manager/shared/domain/enums/user_role.dart';
 
@@ -15,6 +16,7 @@ class UserProfileModel {
     this.companyMembership,
     this.condominiumRoles = const [],
     this.accessibleCondominiumIds = const [],
+    this.enabledModules = const [AppModule.maintenance],
   });
 
   final String id;
@@ -28,6 +30,7 @@ class UserProfileModel {
   final CompanyMembershipModel? companyMembership;
   final List<CondominiumRoleModel> condominiumRoles;
   final List<String> accessibleCondominiumIds;
+  final List<AppModule> enabledModules;
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     final rolesJson = json['user_condominium_roles'] as List<dynamic>? ?? [];
@@ -47,6 +50,13 @@ class UserProfileModel {
       return e.toString();
     }).toList();
 
+    final modulesRaw = json['enabled_modules'] as List<dynamic>? ?? [];
+    final modules = modulesRaw.isEmpty
+        ? const [AppModule.maintenance]
+        : modulesRaw
+            .map((e) => AppModule.fromValue(e is String ? e : e['module'] as String))
+            .toList();
+
     return UserProfileModel(
       id: json['id'] as String,
       email: json['email'] as String,
@@ -61,6 +71,7 @@ class UserProfileModel {
           .map((e) => CondominiumRoleModel.fromJson(e as Map<String, dynamic>))
           .toList(),
       accessibleCondominiumIds: condoIds,
+      enabledModules: modules,
     );
   }
 
@@ -76,6 +87,7 @@ class UserProfileModel {
         companyMembership: companyMembership?.toEntity(),
         condominiumRoles: condominiumRoles.map((r) => r.toEntity()).toList(),
         accessibleCondominiumIds: accessibleCondominiumIds,
+        enabledModules: enabledModules,
       );
 }
 
