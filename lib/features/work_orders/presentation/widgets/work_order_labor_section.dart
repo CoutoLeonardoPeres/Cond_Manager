@@ -14,11 +14,13 @@ class WorkOrderLaborSection extends ConsumerWidget {
     required this.workOrder,
     required this.canManage,
     this.canDelete = false,
+    this.showLaunchButton = true,
   });
 
   final WorkOrder workOrder;
   final bool canManage;
   final bool canDelete;
+  final bool showLaunchButton;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,22 +39,19 @@ class WorkOrderLaborSection extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Mão de obra e deslocamento',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
-                ),
-                if (canManage)
-                  TextButton.icon(
-                    onPressed: () => AddWorkOrderLaborSheet.show(context, workOrder),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Lançar'),
-                  ),
-              ],
+            const Text(
+              'Mão de obra e deslocamento',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
+            if (canManage && showLaunchButton) ...[
+              const SizedBox(height: 12),
+              ClayButton(
+                label: 'Lançar mão de obra',
+                icon: Icons.engineering_rounded,
+                expand: false,
+                onPressed: () => AddWorkOrderLaborSheet.show(context, workOrder),
+              ),
+            ],
             const SizedBox(height: 4),
             const Text(
               'Homem hora por categoria (ex.: eletricista, pedreiro), quantidade de '

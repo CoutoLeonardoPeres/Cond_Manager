@@ -66,6 +66,10 @@ class MaterialModel {
     primary_provider:providers!materials_provider_id_fkey ( trade_name, legal_name ),
     material_supplier_links (
       is_primary,
+      last_purchase_at,
+      last_unit_cost,
+      last_purchase_quantity,
+      last_resale_unit_price,
       supplier:providers!material_supplier_links_provider_id_fkey ( id, trade_name, legal_name )
     )
   ''';

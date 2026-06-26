@@ -1,4 +1,5 @@
 import 'package:cond_manager/features/materials/domain/entities/material_supplier.dart';
+import 'package:cond_manager/shared/domain/material_measure_units.dart';
 import 'package:cond_manager/shared/domain/enums/entity_status.dart';
 import 'package:cond_manager/shared/domain/enums/material_item_type.dart';
 import 'package:cond_manager/shared/domain/enums/service_type.dart';
@@ -58,6 +59,8 @@ class Material extends Equatable {
   final EntityStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  String get unitOfMeasureLabel => MaterialMeasureUnits.labelFor(unitOfMeasure);
 
   double get unitCostWithTax =>
       MaterialPricing.withTax(unitCost, purchaseTaxPercent);
@@ -293,6 +296,7 @@ class StockMovementInput extends Equatable {
     required this.movementType,
     required this.quantity,
     this.unitCost,
+    this.providerId,
     this.notes,
     this.referenceType,
     this.referenceId,
@@ -303,12 +307,13 @@ class StockMovementInput extends Equatable {
   final StockMovementType movementType;
   final double quantity;
   final double? unitCost;
+  final String? providerId;
   final String? notes;
   final String? referenceType;
   final String? referenceId;
 
   @override
-  List<Object?> get props => [materialId, movementType];
+  List<Object?> get props => [materialId, movementType, providerId];
 }
 
 class ProviderPickerForMaterial extends Equatable {

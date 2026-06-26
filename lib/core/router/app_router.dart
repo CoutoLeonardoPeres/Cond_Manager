@@ -8,6 +8,7 @@ import 'package:cond_manager/features/auth/presentation/providers/auth_providers
 import 'package:cond_manager/features/condominiums/presentation/pages/condominium_detail_page.dart';
 import 'package:cond_manager/features/condominiums/presentation/pages/condominium_form_page.dart';
 import 'package:cond_manager/features/condominiums/presentation/pages/condominiums_list_page.dart';
+import 'package:cond_manager/features/access_logs/presentation/pages/access_logs_page.dart';
 import 'package:cond_manager/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:cond_manager/features/shell/presentation/pages/app_shell_page.dart';
 import 'package:cond_manager/features/tickets/presentation/pages/ticket_detail_page.dart';
@@ -175,7 +176,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/materials/new',
-            builder: (_, _) => const MaterialFormPage(),
+            builder: (_, state) => MaterialFormPage(
+              initialCondominiumId: state.uri.queryParameters['condominiumId'],
+              initialServiceType: state.uri.queryParameters['serviceType'],
+            ),
           ),
           GoRoute(
             path: '/materials/:id/edit',
@@ -248,6 +252,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/users',
             builder: (_, _) => const UsersPage(),
+          ),
+          GoRoute(
+            path: '/access-logs',
+            builder: (_, _) => const AccessLogsPage(),
           ),
         ],
       ),

@@ -5,6 +5,8 @@ import 'package:cond_manager/features/work_orders/domain/entities/work_order.dar
 import 'package:cond_manager/features/work_orders/presentation/providers/work_order_providers.dart';
 import 'package:cond_manager/features/work_orders/presentation/utils/work_order_permissions.dart';
 import 'package:cond_manager/features/work_orders/presentation/widgets/work_order_status_chip.dart';
+import 'package:cond_manager/shared/domain/priority_level_style.dart';
+import 'package:cond_manager/shared/widgets/priority_badge.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -201,9 +203,14 @@ class _WorkOrderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final priorityColors = PriorityLevelStyle.colors(workOrder.priority);
+
     return ClayCard(
       onTap: onTap,
+      radius: ClayTokens.radiusCard,
       padding: const EdgeInsets.all(16),
+      backgroundColor: priorityColors.cardBackground,
+      glass: false,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -211,10 +218,11 @@ class _WorkOrderTile extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: ClayTokens.primary.withValues(alpha: 0.12),
+              color: priorityColors.iconBackground,
               borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+              border: Border.all(color: priorityColors.accent.withValues(alpha: 0.25)),
             ),
-            child: const Icon(Icons.assignment_rounded, color: ClayTokens.primary),
+            child: Icon(Icons.assignment_rounded, color: priorityColors.accent),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -241,13 +249,13 @@ class _WorkOrderTile extends StatelessWidget {
                   children: [
                     WorkOrderStatusChip(status: workOrder.status),
                     const SizedBox(width: 12),
-                    WorkOrderPriorityBadge(priority: workOrder.priority),
+                    PriorityBadge(priority: workOrder.priority),
                   ],
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: ClayTokens.textMuted),
+          Icon(Icons.chevron_right_rounded, color: priorityColors.accent.withValues(alpha: 0.5)),
         ],
       ),
     );

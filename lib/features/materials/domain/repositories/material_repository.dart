@@ -19,6 +19,8 @@ abstract class MaterialRepository {
     String? description,
   });
 
+  Future<Result<List<MaterialCategory>>> ensureDefaultCategories(String condominiumId);
+
   Future<Result<List<ProviderPickerForMaterial>>> listSuppliers(String condominiumId);
 
   Future<Result<List<String>>> listSupplierIdsForMaterial(String materialId);
@@ -48,6 +50,15 @@ abstract class MaterialRepository {
   Future<Result<List<StockMovement>>> listStockMovements(String materialId);
 
   Future<Result<StockMovement>> createStockMovement(StockMovementInput input);
+
+  Future<Result<List<MaterialSupplierPurchase>>> listSupplierPurchases(
+    String materialId, {
+    String? providerId,
+  });
+
+  Future<Result<MaterialSupplierPurchase>> recordSupplierPurchase(
+    MaterialSupplierPurchaseInput input,
+  );
 
   Future<Result<MaterialBalanceSummary>> balanceSummary({
     String? condominiumId,

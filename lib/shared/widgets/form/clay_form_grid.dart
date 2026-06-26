@@ -36,19 +36,18 @@ class FormGridSection extends StatelessWidget {
     return ClaySurface(
       depth: ClayDepth.raised,
       radius: ClayTokens.radiusLg,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(ClayTokens.gap(18)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: ClayTokens.primary,
-            ),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: ClayTokens.primary,
+                ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: ClayTokens.gap(14)),
           FormGrid(columns: columns, items: items),
         ],
       ),
@@ -98,7 +97,7 @@ class FormGrid extends StatelessWidget {
         ),
       );
       if (index < items.length) {
-        rows.add(const SizedBox(height: 14));
+        rows.add(SizedBox(height: ClayTokens.gap(12)));
       }
     }
 
@@ -109,7 +108,7 @@ class FormGrid extends StatelessWidget {
     return Expanded(
       flex: flex,
       child: Padding(
-        padding: EdgeInsets.only(left: isFirst ? 0 : 12),
+        padding: EdgeInsets.only(left: isFirst ? 0 : ClayTokens.gap(11)),
         child: child,
       ),
     );

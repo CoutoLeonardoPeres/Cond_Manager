@@ -1,5 +1,6 @@
 enum LocationType {
   unit('unit', 'Unidade'),
+  apartment('apartment', 'Apartamento'),
   commonArea('common_area', 'Área comum'),
   block('block', 'Bloco'),
   tower('tower', 'Torre'),
@@ -9,6 +10,9 @@ enum LocationType {
   const LocationType(this.value, this.label);
   final String value;
   final String label;
+
+  /// Exige seleção de unidade cadastrada (unidade ou apartamento).
+  bool get requiresUnit => this == LocationType.unit || this == LocationType.apartment;
 
   static LocationType fromValue(String value) {
     return LocationType.values.firstWhere(

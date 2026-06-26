@@ -48,14 +48,10 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
   final _managerZipController = TextEditingController();
   bool _isLoading = false;
   String? _error;
-  bool _condoCepLoading = false;
-  bool _managerCepLoading = false;
   bool _loaded = false;
 
   late final AddressFields _condoAddress;
   late final AddressFields _managerAddress;
-  late final AddressCepAutofill _condoCepAutofill;
-  late final AddressCepAutofill _managerCepAutofill;
 
   @override
   void initState() {
@@ -78,25 +74,6 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
       city: _managerCityController,
       state: _managerStateController,
     );
-    _condoCepAutofill = AddressCepAutofill(
-      _condoAddress,
-      onLoadingChanged: (v) => setState(() => _condoCepLoading = v),
-      onNotFound: () => _showCepSnack('CEP do condomínio não encontrado.'),
-    );
-    _managerCepAutofill = AddressCepAutofill(
-      _managerAddress,
-      onLoadingChanged: (v) => setState(() => _managerCepLoading = v),
-      onNotFound: () => _showCepSnack('CEP da administradora não encontrado.'),
-    );
-    _condoCepAutofill.attach();
-    _managerCepAutofill.attach();
-  }
-
-  void _showCepSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
   }
 
   void _goBack(BuildContext context) {
@@ -111,7 +88,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
     _nameController.text = c.name;
     _legalNameController.text = c.legalName ?? '';
     ClayMaskedField.setCnpj(_cnpjController, c.cnpj);
-    _condoCepAutofill.pause();
+    _condoAddress.pauseCepLookup();
     ClayMaskedField.setCep(_zipController, c.zipCode);
     _streetController.text = c.street ?? '';
     _numberController.text = c.number ?? '';
@@ -119,7 +96,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
     _neighborhoodController.text = c.neighborhood ?? '';
     _cityController.text = c.city;
     _stateController.text = c.state;
-    _condoCepAutofill.resume();
+    _condoAddress.resumeCepLookup();
     _syndicNameController.text = c.syndicName ?? '';
     ClayMaskedField.setPhone(_syndicPhoneController, c.syndicPhone);
     _syndicEmailController.text = c.syndicEmail ?? '';
@@ -128,7 +105,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
     _managerContactController.text = c.managerContactName ?? '';
     ClayMaskedField.setPhone(_managerPhoneController, c.managerPhone);
     _managerEmailController.text = c.managerEmail ?? '';
-    _managerCepAutofill.pause();
+    _managerAddress.pauseCepLookup();
     ClayMaskedField.setCep(_managerZipController, c.managerZipCode);
     _managerStreetController.text = c.managerStreet ?? '';
     _managerNumberController.text = c.managerNumber ?? '';
@@ -136,7 +113,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
     _managerNeighborhoodController.text = c.managerNeighborhood ?? '';
     _managerCityController.text = c.managerCity ?? '';
     _managerStateController.text = c.managerState ?? '';
-    _managerCepAutofill.resume();
+    _managerAddress.resumeCepLookup();
     _loaded = true;
   }
 
@@ -172,8 +149,6 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
 
   @override
   void dispose() {
-    _condoCepAutofill.detach();
-    _managerCepAutofill.detach();
     _nameController.dispose();
     _legalNameController.dispose();
     _cnpjController.dispose();
@@ -377,7 +352,6 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
                   fields: _condoAddress,
                   cityRequired: true,
                   stateRequired: true,
-                  cepLoading: _condoCepLoading,
                 ),
                 const SizedBox(height: 16),
                 FormGridSection(
@@ -447,7 +421,6 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
                 buildAddressFormSection(
                   title: 'Endereço da administradora',
                   fields: _managerAddress,
-                  cepLoading: _managerCepLoading,
                 ),
                 const SizedBox(height: 24),
                 Align(

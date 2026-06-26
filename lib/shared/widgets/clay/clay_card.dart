@@ -7,10 +7,14 @@ class ClayCard extends StatelessWidget {
   const ClayCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(20),
+    this.padding = const EdgeInsets.all(24),
     this.onTap,
-    this.depth = ClayDepth.raised,
+    this.depth = ClayDepth.card,
     this.accentColor,
+    this.backgroundColor,
+    this.glass = true,
+    this.liftOnHover = true,
+    this.radius = ClayTokens.radiusCard,
   });
 
   final Widget child;
@@ -18,20 +22,27 @@ class ClayCard extends StatelessWidget {
   final VoidCallback? onTap;
   final ClayDepth depth;
   final Color? accentColor;
+  final Color? backgroundColor;
+  final bool glass;
+  final bool liftOnHover;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
     return ClaySurface(
       depth: depth,
-      radius: ClayTokens.radiusMd,
+      radius: radius,
       padding: padding,
       onTap: onTap,
+      color: backgroundColor,
+      glass: backgroundColor == null && glass,
+      liftOnHover: liftOnHover && onTap != null,
       child: child,
     );
   }
 }
 
-class ClayStatCard extends StatelessWidget {
+class ClayStatCard extends StatefulWidget {
   const ClayStatCard({
     super.key,
     required this.title,
@@ -39,6 +50,7 @@ class ClayStatCard extends StatelessWidget {
     required this.icon,
     required this.accentColor,
     this.onTap,
+    this.gradientIndex = 0,
   });
 
   final String title;
@@ -46,48 +58,86 @@ class ClayStatCard extends StatelessWidget {
   final IconData icon;
   final Color accentColor;
   final VoidCallback? onTap;
+  final int gradientIndex;
+
+  @override
+  State<ClayStatCard> createState() => _ClayStatCardState();
+}
+
+class _ClayStatCardState extends State<ClayStatCard> with SingleTickerProviderStateMixin {
+  late final AnimationController _breathe;
+
+  @override
+  void initState() {
+    super.initState();
+    _breathe = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _breathe.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final gradient = ClayTokens.iconGradientAt(widget.gradientIndex);
+
     return ClayCard(
-      depth: ClayDepth.floating,
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
-            ),
-            child: Icon(icon, color: accentColor, size: 26),
-          ),
+          reduceMotion
+              ? _iconOrb(gradient)
+              : AnimatedBuilder(
+                  animation: _breathe,
+                  builder: (context, child) {
+                    final scale = 1.0 + (_breathe.value * 0.02);
+                    return Transform.scale(scale: scale, child: child);
+                  },
+                  child: _iconOrb(gradient),
+                ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                value,
+                widget.value,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       letterSpacing: -0.5,
                     ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                title,
-                style: const TextStyle(
-                  color: ClayTokens.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+                widget.title,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: ClayTokens.muted,
+                      fontWeight: FontWeight.w500,
+                    ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _iconOrb(Gradient gradient) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+        boxShadow: ClayDecorations.clayButtonShadows(),
+      ),
+      child: Icon(widget.icon, color: Colors.white, size: 26),
     );
   }
 }
@@ -98,7 +148,8 @@ class ClayListTileCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    this.iconColor = ClayTokens.primary,
+    this.iconColor = ClayTokens.accent,
+    this.gradientIndex = 0,
     this.onTap,
   });
 
@@ -106,30 +157,27 @@ class ClayListTileCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color iconColor;
+  final int gradientIndex;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final gradient = ClayTokens.iconGradientAt(gradientIndex);
+
     return ClayCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  iconColor.withValues(alpha: 0.25),
-                  iconColor.withValues(alpha: 0.08),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+              gradient: gradient,
+              borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+              boxShadow: ClayDecorations.clayButtonShadows(),
             ),
-            child: Icon(icon, color: iconColor),
+            child: Icon(icon, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -138,24 +186,22 @@ class ClayListTileCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: ClayTokens.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: ClayTokens.muted,
+                        height: 1.4,
+                      ),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: ClayTokens.textMuted),
+          Icon(Icons.chevron_right_rounded, color: ClayTokens.muted.withValues(alpha: 0.7)),
         ],
       ),
     );

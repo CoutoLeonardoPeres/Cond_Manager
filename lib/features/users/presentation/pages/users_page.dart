@@ -2,6 +2,7 @@ import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/users/domain/entities/organization_user.dart';
 import 'package:cond_manager/features/users/presentation/providers/users_providers.dart';
+import 'package:cond_manager/features/users/presentation/utils/user_management_permissions.dart';
 import 'package:cond_manager/shared/domain/enums/organization_role.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
@@ -121,8 +122,9 @@ class UsersPage extends ConsumerWidget {
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final u = users[index];
+                        final canEdit = perms.canManageOrganizationUser(u);
                         return ClayListTileCard(
-                          icon: _roleIcon(u.organizationRole),
+                          icon: _roleIcon(u),
                           iconColor: ClayTokens.primary,
                           title: u.fullName,
                           subtitle: [
@@ -131,8 +133,11 @@ class UsersPage extends ConsumerWidget {
                             if (u.condominiumNames.isNotEmpty)
                               u.condominiumNames.join(', '),
                             if (u.status != 'active') 'Inativo',
+                            if (!canEdit) 'Somente admin edita',
                           ].join(' · '),
-                          onTap: () => context.go('/users/${u.profileId}/edit'),
+                          onTap: canEdit
+                              ? () => context.go('/users/${u.profileId}/edit')
+                              : null,
                         );
                       },
                     ),
@@ -156,11 +161,14 @@ class UsersPage extends ConsumerWidget {
     );
   }
 
-  IconData _roleIcon(OrganizationRole? role) => switch (role) {
+  IconData _roleIcon(OrganizationUser user) {
+    if (user.isPlatformAdmin) return Icons.admin_panel_settings_rounded;
+    return switch (user.organizationRole) {
         OrganizationRole.manager => Icons.supervisor_account_rounded,
         OrganizationRole.analyst => Icons.analytics_rounded,
         OrganizationRole.fieldTeam => Icons.engineering_rounded,
         OrganizationRole.client => Icons.apartment_rounded,
         null => Icons.person_rounded,
       };
+  }
 }

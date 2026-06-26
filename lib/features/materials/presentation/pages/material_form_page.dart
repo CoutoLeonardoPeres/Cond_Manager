@@ -6,6 +6,7 @@ import 'package:cond_manager/features/materials/presentation/providers/material_
 import 'package:cond_manager/features/materials/presentation/widgets/material_pricing_preview.dart';
 import 'package:cond_manager/features/materials/presentation/widgets/material_suppliers_selector.dart';
 import 'package:cond_manager/features/providers/presentation/widgets/service_specialties_selector.dart';
+import 'package:cond_manager/shared/domain/material_measure_units.dart';
 import 'package:cond_manager/shared/domain/enums/entity_status.dart';
 import 'package:cond_manager/shared/domain/enums/material_item_type.dart';
 import 'package:cond_manager/shared/domain/enums/service_type.dart';
@@ -15,9 +16,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class MaterialFormPage extends ConsumerStatefulWidget {
-  const MaterialFormPage({super.key, this.materialId});
+  const MaterialFormPage({
+    super.key,
+    this.materialId,
+    this.initialCondominiumId,
+    this.initialServiceType,
+  });
 
   final String? materialId;
+  final String? initialCondominiumId;
+  final String? initialServiceType;
 
   bool get isEditing => materialId != null;
 
@@ -29,7 +37,7 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _skuController = TextEditingController();
-  final _unitController = TextEditingController(text: 'un');
+  MaterialMeasureUnit _selectedUnit = MaterialMeasureUnits.un;
   final _unitCostController = TextEditingController();
   final _purchaseTaxController = TextEditingController(text: '0');
   final _resalePriceController = TextEditingController();
@@ -49,12 +57,62 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
   bool _loading = false;
   String? _error;
   bool _loaded = false;
+  bool _condoInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final serviceType = widget.initialServiceType;
+    if (serviceType != null && serviceType.isNotEmpty) {
+      _services = {ServiceType.fromValue(serviceType)};
+    }
+  }
+
+  void _applyInitialCondominium(List<Condominium> condos) {
+    if (_condoInitialized || _condominium != null) return;
+
+    Condominium? selected;
+    final initialId = widget.initialCondominiumId;
+    if (initialId != null) {
+      for (final condo in condos) {
+        if (condo.id == initialId) {
+          selected = condo;
+          break;
+        }
+      }
+    } else {
+      final filterCondoId = ref.read(materialListFilterProvider).condominiumId;
+      if (filterCondoId != null) {
+        for (final condo in condos) {
+          if (condo.id == filterCondoId) {
+            selected = condo;
+            break;
+          }
+        }
+      }
+      selected ??= condos.length == 1 ? condos.first : null;
+    }
+
+    if (selected != null) {
+      _condoInitialized = true;
+      setState(() => _condominium = selected);
+    }
+  }
+
+  mat.MaterialCategory? _resolveCategorySelection(
+    List<mat.MaterialCategory> categories,
+  ) {
+    if (_category == null) return null;
+    for (final category in categories) {
+      if (category.id == _category!.id) return category;
+    }
+    return _category;
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _skuController.dispose();
-    _unitController.dispose();
     _unitCostController.dispose();
     _purchaseTaxController.dispose();
     _resalePriceController.dispose();
@@ -70,7 +128,7 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
   void _fill(mat.Material m, List<Condominium> condos) {
     _nameController.text = m.name;
     _skuController.text = m.sku ?? '';
-    _unitController.text = m.unitOfMeasure;
+    _selectedUnit = MaterialMeasureUnits.resolve(m.unitOfMeasure);
     _unitCostController.text = m.unitCost.toString();
     _purchaseTaxController.text = m.purchaseTaxPercent.toString();
     _resalePriceController.text = m.resaleUnitPrice.toString();
@@ -149,7 +207,7 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
         sku: _skuController.text,
         itemType: _itemType,
         isStorable: _isStorable,
-        unitOfMeasure: _unitController.text,
+        unitOfMeasure: _selectedUnit.code,
         unitCost: unitCost,
         purchaseTaxPercent: purchaseTax,
         resaleUnitPrice: resale,
@@ -189,7 +247,7 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
         sku: _skuController.text,
         itemType: _itemType,
         isStorable: _isStorable,
-        unitOfMeasure: _unitController.text,
+        unitOfMeasure: _selectedUnit.code,
         unitCost: unitCost,
         purchaseTaxPercent: purchaseTax,
         resaleUnitPrice: resale,
@@ -225,6 +283,16 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
   Widget build(BuildContext context) {
     final condosAsync = ref.watch(accessibleCondominiumsProvider);
     final condos = condosAsync.value ?? const <Condominium>[];
+
+    ref.listen(accessibleCondominiumsProvider, (previous, next) {
+      next.whenData(_applyInitialCondominium);
+    });
+    if (!_condoInitialized && condos.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _applyInitialCondominium(condos);
+      });
+    }
+
     final condoId = _condominium?.id;
     final categoriesAsync = condoId != null
         ? ref.watch(materialCategoriesProvider(condoId))
@@ -265,10 +333,6 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
       if (detail.isLoading && !_loaded) {
         return const Center(child: CircularProgressIndicator(strokeWidth: 3));
       }
-    } else if (_condominium == null && condos.length == 1) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _condominium == null) setState(() => _condominium = condos.first);
-      });
     }
 
     final unitCost = _parseNum(_unitCostController.text);
@@ -361,30 +425,20 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
                     ),
                     FormGridField(
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: categoriesAsync.when(
-                              data: (cats) {
-                                final items = [null, ...cats];
-                                return ClayDropdownField<mat.MaterialCategory?>(
-                                  label: 'Categoria',
-                                  value: _category,
-                                  items: items,
-                                  itemLabel: (c) => c?.name ?? 'Sem categoria',
-                                  onChanged: (v) => setState(() => _category = v),
-                                );
-                              },
-                              loading: () => const LinearProgressIndicator(),
-                              error: (_, _) => const SizedBox.shrink(),
-                            ),
+                            child: _buildCategoryField(categoriesAsync, condoId),
                           ),
                           if (condoId != null) ...[
                             const SizedBox(width: 8),
-                            IconButton(
-                              onPressed: _addCategory,
-                              icon: const Icon(Icons.add_circle_outline),
-                              tooltip: 'Nova categoria',
+                            Padding(
+                              padding: const EdgeInsets.only(top: 28),
+                              child: IconButton(
+                                onPressed: _addCategory,
+                                icon: const Icon(Icons.add_circle_outline),
+                                tooltip: 'Nova categoria',
+                              ),
                             ),
                           ],
                         ],
@@ -497,9 +551,16 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
                       ),
                     ),
                     FormGridField(
-                      child: ClayTextField(
-                        controller: _unitController,
+                      child: ClayDropdownField<MaterialMeasureUnit>(
                         label: 'Unidade de medida *',
+                        value: _selectedUnit,
+                        items: MaterialMeasureUnits.all,
+                        itemLabel: (u) => u.label,
+                        hint: 'Selecione a unidade',
+                        validator: (v) => v == null ? 'Obrigatório' : null,
+                        onChanged: (v) {
+                          if (v != null) setState(() => _selectedUnit = v);
+                        },
                       ),
                     ),
                   ],
@@ -562,6 +623,68 @@ class _MaterialFormPageState extends ConsumerState<MaterialFormPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCategoryField(
+    AsyncValue<List<mat.MaterialCategory>> categoriesAsync,
+    String? condoId,
+  ) {
+    if (condoId == null) {
+      return ClayDropdownField<mat.MaterialCategory?>(
+        label: 'Categoria',
+        value: null,
+        items: const [null],
+        itemLabel: (c) => 'Selecione o condomínio primeiro',
+        onChanged: null,
+      );
+    }
+
+    return categoriesAsync.when(
+      data: (cats) {
+        final items = [null, ...cats];
+        return ClayDropdownField<mat.MaterialCategory?>(
+          label: 'Categoria',
+          value: _resolveCategorySelection(cats),
+          items: items,
+          hint: cats.isEmpty ? 'Nenhuma categoria disponível' : 'Selecione uma categoria',
+          itemLabel: (c) => c?.name ?? 'Sem categoria',
+          onChanged: (v) => setState(() => _category = v),
+        );
+      },
+      loading: () => const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Categoria',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: ClayTokens.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          SizedBox(height: 8),
+          LinearProgressIndicator(),
+        ],
+      ),
+      error: (error, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Categoria',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: ClayTokens.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Erro ao carregar categorias: $error',
+            style: const TextStyle(color: ClayTokens.error, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 }

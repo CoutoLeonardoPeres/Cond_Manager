@@ -41,8 +41,7 @@ class WorkOrderLaborModel {
 
   static const selectQuery = '''
     *,
-    provider:providers ( trade_name, legal_name ),
-    profile:profiles!work_order_labor_profile_id_fkey ( full_name )
+    provider:providers ( trade_name, legal_name )
   ''';
 
   factory WorkOrderLaborModel.fromJson(Map<String, dynamic> json) {

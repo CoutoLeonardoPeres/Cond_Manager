@@ -25,6 +25,8 @@ class TicketModel {
     this.assignedTo,
     this.workOrderId,
     this.resolvedAt,
+    this.analysisStartedAt,
+    this.problemAcceptedAt,
     this.condominiumName,
     this.requesterName,
     this.assigneeName,
@@ -47,6 +49,8 @@ class TicketModel {
   final String? assignedTo;
   final String? workOrderId;
   final DateTime? resolvedAt;
+  final DateTime? analysisStartedAt;
+  final DateTime? problemAcceptedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? condominiumName;
@@ -78,6 +82,12 @@ class TicketModel {
       resolvedAt: json['resolved_at'] != null
           ? DateTime.parse(json['resolved_at'] as String)
           : null,
+      analysisStartedAt: json['analysis_started_at'] != null
+          ? DateTime.parse(json['analysis_started_at'] as String)
+          : null,
+      problemAcceptedAt: json['problem_accepted_at'] != null
+          ? DateTime.parse(json['problem_accepted_at'] as String)
+          : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       condominiumName: condos is Map ? condos['name'] as String? : null,
@@ -104,6 +114,8 @@ class TicketModel {
         assignedTo: assignedTo,
         workOrderId: workOrderId,
         resolvedAt: resolvedAt,
+        analysisStartedAt: analysisStartedAt,
+        problemAcceptedAt: problemAcceptedAt,
         createdAt: createdAt,
         updatedAt: updatedAt,
         condominiumName: condominiumName,

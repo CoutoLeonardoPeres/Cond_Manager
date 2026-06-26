@@ -1,6 +1,7 @@
 import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/features/auth/domain/entities/user_profile.dart';
 import 'package:cond_manager/shared/domain/enums/user_role.dart';
+import 'package:cond_manager/shared/domain/enums/work_order_status.dart';
 
 extension WorkOrderPermissions on UserProfile {
   bool get canCreateWorkOrdersAnywhere {
@@ -34,5 +35,23 @@ extension WorkOrderPermissions on UserProfile {
     if (isPlatformAdmin) return true;
     final role = roleInCondominium(condominiumId);
     return role?.canManageCondominium ?? false;
+  }
+
+  /// Após concluída ou cancelada, só admin/gerente pode alterar o status.
+  bool canOverrideTerminalWorkOrderStatus(String condominiumId) {
+    if (isPlatformAdmin) return true;
+    if (permissions.isAdmin || permissions.isManager) {
+      return permissions.isAdmin ||
+          hasCompanyAccessToCondominium(condominiumId);
+    }
+    final role = roleInCondominium(condominiumId);
+    return role == UserRole.condominiumAdmin ||
+        role == UserRole.maintenanceManager;
+  }
+
+  bool canChangeWorkOrderStatus(WorkOrderStatus currentStatus, String condominiumId) {
+    if (!canManageWorkOrderIn(condominiumId)) return false;
+    if (!currentStatus.isLockedForNonManagers) return true;
+    return canOverrideTerminalWorkOrderStatus(condominiumId);
   }
 }

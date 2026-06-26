@@ -68,6 +68,7 @@ class ClayMaskedField {
     Widget? suffixIcon,
     bool required = false,
     String? Function(String?)? validator,
+    Future<void> Function()? onComplete,
   }) {
     return ClayTextField(
       controller: controller,
@@ -78,6 +79,12 @@ class ClayMaskedField {
       inputFormatters: [CepMaskFormatter()],
       validator: validator ??
           (required ? (v) => BrazilianValidators.cep(v, required: true) : null),
+      onChanged: (value) {
+        final digits = BrazilianInputFormat.digitsOnly(value);
+        if (digits.length == 8) {
+          onComplete?.call();
+        }
+      },
     );
   }
 

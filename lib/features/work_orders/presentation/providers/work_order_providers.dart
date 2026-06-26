@@ -1,5 +1,6 @@
 import 'package:cond_manager/core/providers/supabase_provider.dart';
 import 'package:cond_manager/features/work_orders/data/repositories/work_order_repository_impl.dart';
+import 'package:cond_manager/features/tickets/domain/entities/status_change_log.dart';
 import 'package:cond_manager/features/work_orders/domain/entities/work_order.dart';
 import 'package:cond_manager/features/work_orders/domain/repositories/work_order_repository.dart';
 import 'package:cond_manager/shared/domain/enums/work_order_status.dart';
@@ -17,6 +18,16 @@ final workOrdersListProvider = FutureProvider.autoDispose<List<WorkOrder>>((ref)
   final filter = ref.watch(workOrderListFilterProvider);
   final repo = ref.watch(workOrderRepositoryProvider);
   final result = await repo.list(filter);
+  return result.when(
+    success: (list) => list,
+    failure: (e) => throw e,
+  );
+});
+
+final workOrderStatusChangesProvider =
+    FutureProvider.autoDispose.family<List<StatusChangeLog>, String>((ref, workOrderId) async {
+  final repo = ref.watch(workOrderRepositoryProvider);
+  final result = await repo.listStatusChanges(workOrderId);
   return result.when(
     success: (list) => list,
     failure: (e) => throw e,

@@ -1,4 +1,5 @@
 import 'package:cond_manager/core/utils/result.dart';
+import 'package:cond_manager/features/tickets/domain/entities/status_change_log.dart';
 import 'package:cond_manager/features/work_orders/domain/entities/work_order.dart';
 import 'package:cond_manager/features/work_orders/domain/entities/work_order_labor.dart';
 import 'package:cond_manager/features/work_orders/domain/entities/work_order_material.dart';
@@ -11,7 +12,14 @@ abstract class WorkOrderRepository {
 
   Future<Result<WorkOrder>> create(WorkOrderCreateInput input);
 
-  Future<Result<WorkOrder>> updateStatus(String id, WorkOrderStatus status);
+  Future<Result<WorkOrder>> updateStatus(
+    String id,
+    WorkOrderStatus status, {
+    String? notes,
+    Map<String, dynamic> metadata = const {},
+  });
+
+  Future<Result<List<StatusChangeLog>>> listStatusChanges(String workOrderId);
 
   Future<Result<List<InternalStaffOption>>> listInternalStaff(String condominiumId);
 

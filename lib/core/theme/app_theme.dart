@@ -1,3 +1,4 @@
+import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,19 +8,15 @@ export 'clay_tokens.dart';
 
 class AppTheme {
   static ThemeData get light {
-    final baseText = GoogleFonts.plusJakartaSansTextTheme();
-    final textTheme = baseText.apply(
-      bodyColor: ClayTokens.textPrimary,
-      displayColor: ClayTokens.textPrimary,
-    );
+    final textTheme = AppTypography.buildTextTheme();
 
     final colorScheme = ColorScheme.light(
-      primary: ClayTokens.primary,
+      primary: ClayTokens.accent,
       onPrimary: ClayTokens.textOnPrimary,
-      secondary: ClayTokens.secondary,
-      onSecondary: ClayTokens.textPrimary,
+      secondary: ClayTokens.tertiary,
+      onSecondary: ClayTokens.foreground,
       surface: ClayTokens.surfaceRaised,
-      onSurface: ClayTokens.textPrimary,
+      onSurface: ClayTokens.foreground,
       error: ClayTokens.error,
       onError: ClayTokens.textOnPrimary,
     );
@@ -27,61 +24,54 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: ClayTokens.bgTop,
-      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
-      textTheme: textTheme.copyWith(
-        headlineLarge: textTheme.headlineLarge?.copyWith(
-          fontWeight: FontWeight.w800,
-          letterSpacing: -1.2,
-        ),
-        headlineMedium: textTheme.headlineMedium?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.6,
-        ),
-        titleLarge: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-        labelLarge: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-      ),
+      scaffoldBackgroundColor: ClayTokens.canvas,
+      fontFamily: AppTypography.bodyFamily,
+      textTheme: textTheme,
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: ClayTokens.textPrimary,
+        foregroundColor: ClayTokens.foreground,
         centerTitle: false,
-        titleTextStyle: textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: ClayTokens.textPrimary,
+        titleTextStyle: AppTypography.heading(
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          color: ClayTokens.foreground,
         ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: ClayTokens.surfaceRaised,
+        color: ClayTokens.cardGlass,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+          borderRadius: BorderRadius.circular(ClayTokens.radiusCard),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: ClayTokens.surface,
-        labelStyle: const TextStyle(color: ClayTokens.textSecondary),
-        hintStyle: const TextStyle(color: ClayTokens.textMuted),
+        fillColor: ClayTokens.inputBg,
+        labelStyle: AppTypography.body(
+          fontWeight: FontWeight.w600,
+          color: ClayTokens.muted,
+        ),
+        hintStyle: AppTypography.body(color: ClayTokens.muted),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+          borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+          borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
-          borderSide: const BorderSide(color: ClayTokens.primary, width: 2),
+          borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
+          borderSide: BorderSide(color: ClayTokens.accent.withValues(alpha: 0.4), width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+          borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
           borderSide: const BorderSide(color: ClayTokens.error, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -89,60 +79,58 @@ class AppTheme {
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           foregroundColor: ClayTokens.textOnPrimary,
-          minimumSize: const Size(double.infinity, 54),
+          minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+            borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          textStyle: AppTypography.body(fontWeight: FontWeight.w700, fontSize: 15),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: ClayTokens.primary,
-          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+          foregroundColor: ClayTokens.accent,
+          textStyle: AppTypography.body(fontWeight: FontWeight.w600),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
-        height: 72,
+        height: 80,
         backgroundColor: Colors.transparent,
-        indicatorColor: ClayTokens.primary.withValues(alpha: 0.15),
+        indicatorColor: ClayTokens.accent.withValues(alpha: 0.15),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return TextStyle(
+          return GoogleFonts.dmSans(
             fontSize: 11,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected ? ClayTokens.primary : ClayTokens.textMuted,
+            color: selected ? ClayTokens.accent : ClayTokens.muted,
           );
         }),
       ),
       navigationRailTheme: NavigationRailThemeData(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        selectedIconTheme: const IconThemeData(color: ClayTokens.primary, size: 26),
-        unselectedIconTheme: IconThemeData(color: ClayTokens.textMuted.withValues(alpha: 0.9)),
-        selectedLabelTextStyle: const TextStyle(
-          color: ClayTokens.primary,
+        selectedIconTheme: const IconThemeData(color: ClayTokens.accent, size: 26),
+        unselectedIconTheme: IconThemeData(color: ClayTokens.muted.withValues(alpha: 0.9)),
+        selectedLabelTextStyle: GoogleFonts.dmSans(
+          color: ClayTokens.accent,
           fontWeight: FontWeight.w700,
           fontSize: 12,
         ),
-        unselectedLabelTextStyle: const TextStyle(
-          color: ClayTokens.textMuted,
+        unselectedLabelTextStyle: GoogleFonts.dmSans(
+          color: ClayTokens.muted,
           fontWeight: FontWeight.w500,
           fontSize: 11,
         ),
       ),
       dividerTheme: DividerThemeData(
-        color: ClayTokens.shadowDark.withValues(alpha: 0.25),
+        color: ClayTokens.shadowDark.withValues(alpha: 0.35),
         thickness: 1,
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: ClayTokens.primary,
-      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(color: ClayTokens.accent),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+          borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
         ),
       ),
     );

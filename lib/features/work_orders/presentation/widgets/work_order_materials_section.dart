@@ -15,11 +15,13 @@ class WorkOrderMaterialsSection extends ConsumerWidget {
     required this.workOrder,
     required this.canManage,
     this.canDelete = false,
+    this.showLaunchButton = true,
   });
 
   final WorkOrder workOrder;
   final bool canManage;
   final bool canDelete;
+  final bool showLaunchButton;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,22 +40,19 @@ class WorkOrderMaterialsSection extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Materiais e equipamentos',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
-                ),
-                if (canManage)
-                  TextButton.icon(
-                    onPressed: () => AddWorkOrderMaterialSheet.show(context, workOrder),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Lançar'),
-                  ),
-              ],
+            const Text(
+              'Materiais e equipamentos',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
+            if (canManage && showLaunchButton) ...[
+              const SizedBox(height: 12),
+              ClayButton(
+                label: 'Lançar material',
+                icon: Icons.add_shopping_cart_rounded,
+                expand: false,
+                onPressed: () => AddWorkOrderMaterialSheet.show(context, workOrder),
+              ),
+            ],
             const SizedBox(height: 4),
             const Text(
               'Custos operacionais (compra + impostos) e repasse ao condomínio.',

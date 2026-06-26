@@ -30,13 +30,12 @@ class ClayDropdownField<T> extends StatelessWidget {
         if (label != null) ...[
           Text(
             label!,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-              color: ClayTokens.textSecondary,
-            ),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: ClayTokens.textSecondary,
+                ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: ClayTokens.gap(8)),
         ],
         Container(
           decoration: BoxDecoration(
@@ -67,6 +66,7 @@ class ClayDropdownField<T> extends StatelessWidget {
                     child: Text(
                       itemLabel(item),
                       overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
                 )

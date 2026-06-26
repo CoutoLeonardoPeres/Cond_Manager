@@ -1,5 +1,8 @@
 import 'package:cond_manager/core/permissions/app_permissions.dart';
+import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
+import 'package:cond_manager/features/access_logs/presentation/providers/access_log_providers.dart';
+import 'package:cond_manager/features/access_logs/presentation/widgets/access_session_scope.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +24,7 @@ class AppShellPage extends ConsumerWidget {
     _NavItem('/preventive', Icons.event_repeat_rounded, 'Preventiva'),
     _NavItem('/financial', Icons.payments_rounded, 'Financeiro'),
     _NavItem('/users', Icons.people_rounded, 'Usuários'),
+    _NavItem('/access-logs', Icons.history_rounded, 'Log de acesso'),
   ];
 
   @override
@@ -50,7 +54,8 @@ class AppShellPage extends ConsumerWidget {
 
     final bottomCount = navItems.length.clamp(1, 5);
 
-    return ClayScaffold(
+    return AccessSessionScope(
+      child: ClayScaffold(
       appBar: ClayAppBar(
         title: 'Cond Manager',
         actions: [
@@ -101,6 +106,7 @@ class AppShellPage extends ConsumerWidget {
               tooltip: 'Sair',
               color: ClayTokens.textSecondary,
               onPressed: () async {
+                await endAccessSessionTracking(ref);
                 await ref.read(authRepositoryProvider).signOut();
                 if (context.mounted) context.go('/login');
               },
@@ -111,34 +117,41 @@ class AppShellPage extends ConsumerWidget {
       ),
       bottomNavigationBar: isWide
           ? null
-          : ClayBottomNav(
-              items: navItems.take(bottomCount).toList(),
-              selectedIndex: safeIndex.clamp(0, bottomCount - 1),
-              onSelected: (i) => context.go(destinations[i].path),
+          : MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: AppTypography.navTextScaler),
+              child: ClayBottomNav(
+                items: navItems.take(bottomCount).toList(),
+                selectedIndex: safeIndex.clamp(0, bottomCount - 1),
+                onSelected: (i) => context.go(destinations[i].path),
+              ),
             ),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (isWide)
-            SizedBox(
-              width: 240,
-              child: ClayNavRail(
-                items: navItems,
-                selectedIndex: safeIndex,
-                onSelected: (i) => context.go(destinations[i].path),
+            MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: AppTypography.navTextScaler),
+              child: SizedBox(
+                width: 240,
+                child: ClayNavRail(
+                  items: navItems,
+                  selectedIndex: safeIndex,
+                  onSelected: (i) => context.go(destinations[i].path),
+                ),
               ),
             ),
           Expanded(
             child: ClipRRect(
               borderRadius: isWide
                   ? const BorderRadius.only(
-                      topLeft: Radius.circular(ClayTokens.radiusLg),
+                      topLeft: Radius.circular(ClayTokens.radiusHero),
                     )
                   : BorderRadius.zero,
               child: child,
             ),
           ),
         ],
+      ),
       ),
     );
   }

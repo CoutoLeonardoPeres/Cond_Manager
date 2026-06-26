@@ -29,6 +29,7 @@ class OrganizationUser extends Equatable {
     required this.fullName,
     this.phone,
     required this.status,
+    this.isPlatformAdmin = false,
     this.membershipId,
     this.companyId,
     this.companyName,
@@ -42,6 +43,7 @@ class OrganizationUser extends Equatable {
   final String fullName;
   final String? phone;
   final String status;
+  final bool isPlatformAdmin;
   final String? membershipId;
   final String? companyId;
   final String? companyName;
@@ -50,6 +52,7 @@ class OrganizationUser extends Equatable {
   final List<String> condominiumIds;
 
   String get roleLabel {
+    if (isPlatformAdmin) return 'Administrador da plataforma';
     if (organizationRole != null) return organizationRole!.label;
     if (condominiumNames.isNotEmpty) return 'Cliente condomínio';
     return '—';

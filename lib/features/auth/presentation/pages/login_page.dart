@@ -1,3 +1,4 @@
+import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
@@ -68,7 +69,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   constraints: const BoxConstraints(maxWidth: 420),
                   child: ClaySurface(
                     depth: ClayDepth.floating,
-                    radius: ClayTokens.radiusXl,
+                    radius: ClayTokens.radiusHero,
                     padding: const EdgeInsets.all(32),
                     child: Form(
                       key: _formKey,
@@ -92,22 +93,27 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            Text(
-                              'Cond Manager',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: ClayTokens.primary,
-                                  ),
+                            ShaderMask(
+                              shaderCallback: (bounds) =>
+                                  ClayTokens.textGradient.createShader(bounds),
+                              child: Text(
+                                'Cond Manager',
+                                textAlign: TextAlign.center,
+                                style: AppTypography.heading(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 28),
                           ],
                           Text(
                             'Bem-vindo de volta',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
-                                ),
+                            style: AppTypography.heading(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                           const SizedBox(height: 6),
                           const Text(
@@ -221,33 +227,33 @@ class _BrandingPanel extends StatelessWidget {
       child: ClaySurface(
         gradient: ClayTokens.brandPanelGradient,
         borderless: true,
-        radius: ClayTokens.radiusXl,
+        radius: ClayTokens.radiusHero,
         depth: ClayDepth.floating,
         padding: const EdgeInsets.all(48),
-        child: const Center(
+        glass: false,
+        child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _BrandIcon(),
-              SizedBox(height: 28),
+              const _BrandIcon(),
+              const SizedBox(height: 28),
               Text(
                 'Cond Manager',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w800,
+                style: AppTypography.heading(
+                  fontSize: 40,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white,
-                  letterSpacing: -1,
                 ),
               ),
-              SizedBox(height: 14),
+              const SizedBox(height: 14),
               Text(
-                'Controle operacional, financeiro e administrativo de manutenções em condomínios — com visual clay ultramoderno.',
+                'Gestão de manutenção para condomínios — interface clay premium, tátil e acolhedora.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: AppTypography.body(
                   fontSize: 16,
-                  color: Colors.white,
-                  height: 1.55,
                   fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.92),
+                  height: 1.55,
                 ),
               ),
             ],
@@ -268,7 +274,7 @@ class _BrandIcon extends StatelessWidget {
       height: 96,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(ClayTokens.radiusLg),
+        borderRadius: BorderRadius.circular(ClayTokens.radiusCard),
         border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
       ),
       child: const Icon(Icons.apartment_rounded, size: 52, color: Colors.white),

@@ -77,7 +77,7 @@ class MaterialDetailPage extends ConsumerWidget {
                       const Icon(Icons.warning_amber_rounded, color: ClayTokens.warning),
                       const SizedBox(width: 8),
                       Text(
-                        'Estoque baixo: ${m.currentStock} ${m.unitOfMeasure} (mín. ${m.minStock})',
+                        'Estoque baixo: ${m.currentStock} ${m.unitOfMeasureLabel} (mín. ${m.minStock})',
                       ),
                     ],
                   ),
@@ -104,6 +104,7 @@ class MaterialDetailPage extends ConsumerWidget {
                   ),
                   _InfoRow('Categoria', m.categoryName ?? '—'),
                   _InfoRow('SKU', m.sku ?? '—'),
+                  _InfoRow('Unidade de medida', m.unitOfMeasureLabel),
                   _InfoRow('Serviços', m.applicableServicesLabel),
                   if (m.description?.isNotEmpty == true) _InfoRow('Descrição', m.description!),
                 ],
@@ -118,7 +119,7 @@ class MaterialDetailPage extends ConsumerWidget {
                     children: [
                       const Text('Estoque', style: TextStyle(fontWeight: FontWeight.w700)),
                       const SizedBox(height: 8),
-                      Text('Atual: ${m.currentStock} ${m.unitOfMeasure}'),
+                      Text('Atual: ${m.currentStock} ${m.unitOfMeasureLabel}'),
                       Text('Valor custo: ${currency.format(m.stockValueAtCost)}'),
                       Text('Valor repasse: ${currency.format(m.stockValueAtResale)}'),
                       if (canManage) ...[

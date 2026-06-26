@@ -3,7 +3,7 @@ import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-class ClayTextField extends StatelessWidget {
+class ClayTextField extends StatefulWidget {
   const ClayTextField({
     super.key,
     this.controller,
@@ -34,54 +34,75 @@ class ClayTextField extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
 
   @override
+  State<ClayTextField> createState() => _ClayTextFieldState();
+}
+
+class _ClayTextFieldState extends State<ClayTextField> {
+  final _focusNode = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() => setState(() => _focused = _focusNode.hasFocus));
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (label != null) ...[
+        if (widget.label != null) ...[
           Text(
-            label!,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-              color: ClayTokens.textSecondary,
-            ),
+            widget.label!,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: ClayTokens.muted,
+                ),
           ),
           const SizedBox(height: 8),
         ],
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: ClayTokens.surface,
-            borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
-            boxShadow: ClayDecorations.insetShadows(),
-            border: Border.all(
-              color: ClayTokens.highlight.withValues(alpha: 0.5),
-              width: 1,
-            ),
+            color: _focused ? ClayTokens.surfaceRaised : ClayTokens.inputBg,
+            borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
+            boxShadow: _focused ? ClayDecorations.clayCardShadows() : ClayDecorations.clayPressedShadows(),
+            border: _focused
+                ? Border.all(color: ClayTokens.accent.withValues(alpha: 0.25), width: 2)
+                : null,
           ),
           child: TextFormField(
-            controller: controller,
-            obscureText: obscureText,
-            keyboardType: keyboardType,
-            validator: validator,
-            onChanged: onChanged,
-            maxLines: maxLines,
-            readOnly: readOnly,
-            inputFormatters: inputFormatters,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              color: ClayTokens.textPrimary,
-            ),
+            controller: widget.controller,
+            focusNode: _focusNode,
+            obscureText: widget.obscureText,
+            keyboardType: widget.keyboardType,
+            validator: widget.validator,
+            onChanged: widget.onChanged,
+            maxLines: widget.maxLines,
+            readOnly: widget.readOnly,
+            inputFormatters: widget.inputFormatters,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: ClayTokens.foreground,
+                ),
             decoration: InputDecoration(
-              hintText: hint,
-              prefixIcon: prefixIcon,
-              suffixIcon: suffixIcon,
+              hintText: widget.hint,
+              hintStyle: TextStyle(color: ClayTokens.muted.withValues(alpha: 0.85)),
+              prefixIcon: widget.prefixIcon,
+              suffixIcon: widget.suffixIcon,
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
               errorBorder: InputBorder.none,
               filled: false,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
             ),
           ),
         ),

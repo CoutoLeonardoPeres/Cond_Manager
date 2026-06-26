@@ -59,6 +59,8 @@ class AppPermissions {
 
   bool get canManageUsers => isAdmin || isManager;
 
+  bool get canViewAccessLogs => isAdmin || isManager;
+
   bool get canManageCondominiumsGlobal => isAdmin;
 
   bool canEditCondominium(String condominiumId) {
@@ -82,6 +84,7 @@ class AppPermissions {
   bool canAccessRoute(String path) {
     if (isAdmin || isManager || isAnalyst || tier == AppAccessTier.legacyStaff) {
       if (path.startsWith('/users') && !canManageUsers) return false;
+      if (path.startsWith('/access-logs') && !canViewAccessLogs) return false;
       if (path.startsWith('/condominiums/new') && !canManageCondominiumsGlobal) {
         return isManager;
       }
@@ -111,6 +114,7 @@ class AppPermissions {
         '/financial',
       ];
       if (canManageUsers) paths.add('/users');
+      if (canViewAccessLogs) paths.add('/access-logs');
       return paths;
     }
     if (isFieldTeam) return ['/', '/tickets', '/work-orders'];

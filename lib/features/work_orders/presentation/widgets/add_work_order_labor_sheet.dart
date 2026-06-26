@@ -17,13 +17,16 @@ class AddWorkOrderLaborSheet extends ConsumerStatefulWidget {
   final WorkOrder workOrder;
 
   static Future<void> show(BuildContext context, WorkOrder workOrder) {
-    return showModalBottomSheet<void>(
+    return showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-        child: AddWorkOrderLaborSheet(workOrder: workOrder),
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 720),
+          child: AddWorkOrderLaborSheet(workOrder: workOrder),
+        ),
       ),
     );
   }
@@ -146,144 +149,199 @@ class _AddWorkOrderLaborSheetState extends ConsumerState<AddWorkOrderLaborSheet>
     );
 
     return ClaySurface(
-      depth: ClayDepth.raised,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Lançar mão de obra',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<LaborSource>(
-              segments: const [
-                ButtonSegment(value: LaborSource.thirdParty, label: Text('Terceirizado')),
-                ButtonSegment(value: LaborSource.internalTeam, label: Text('Equipe própria')),
-              ],
-              selected: {_source},
-              onSelectionChanged: (s) => setState(() {
-                _source = s.first;
-                _provider = null;
-                _staff = null;
-              }),
-            ),
-            const SizedBox(height: 12),
-            ClayDropdownField<ServiceType>(
-              label: 'Categoria / função *',
-              value: _serviceType,
-              items: ServiceType.values,
-              itemLabel: (t) => t.label,
-              onChanged: (v) => setState(() {
-                _serviceType = v ?? ServiceType.other;
-                _provider = null;
-              }),
-            ),
-            const SizedBox(height: 12),
-            if (_source == LaborSource.internalTeam)
-              staffAsync.when(
-                data: (list) {
-                  final items = [null, ...list];
-                  return ClayDropdownField<InternalStaffOption?>(
-                    label: 'Funcionário (opcional)',
-                    value: _staff,
-                    items: items,
-                    itemLabel: (s) => s == null ? '—' : '${s.fullName} (${s.roleLabel})',
-                    onChanged: (v) => setState(() {
-                      _staff = v;
-                      if (v != null) _workerNameController.text = v.fullName;
-                    }),
-                  );
-                },
-                loading: () => const LinearProgressIndicator(),
-                error: (_, _) => const SizedBox.shrink(),
-              )
-            else
-              providersAsync.when(
-                data: (list) {
-                  final items = [null, ...list];
-                  return ClayDropdownField<ProviderPickerOption?>(
-                    label: 'Prestador (opcional)',
-                    value: _provider,
-                    items: items,
-                    itemLabel: (p) => p?.label ?? '—',
-                    onChanged: (v) => setState(() {
-                      _provider = v;
-                      if (v != null) _workerNameController.text = v.label;
-                    }),
-                  );
-                },
-                loading: () => const LinearProgressIndicator(),
-                error: (_, _) => const SizedBox.shrink(),
+      depth: ClayDepth.floating,
+      radius: ClayTokens.radiusLg,
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Lançar mão de obra',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                ),
               ),
-            const SizedBox(height: 12),
-            ClayTextField(
-              controller: _workerNameController,
-              label: 'Nome / equipe *',
-              hint: 'Ex.: Equipe elétrica João, Pedreiros Silva',
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ClayTextField(
-                    controller: _workerCountController,
-                    label: 'Nº profissionais *',
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'Fechar',
+              ),
+            ],
+          ),
+          Text(
+            'Local: ${widget.workOrder.locationType.label} · ${widget.workOrder.serviceType.label}',
+            style: const TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(right: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<LaborSource>(
+                    segments: const [
+                      ButtonSegment(
+                        value: LaborSource.thirdParty,
+                        label: Text('Contratada'),
+                        icon: Icon(Icons.handshake_outlined, size: 18),
+                      ),
+                      ButtonSegment(
+                        value: LaborSource.internalTeam,
+                        label: Text('Própria'),
+                        icon: Icon(Icons.groups_outlined, size: 18),
+                      ),
+                    ],
+                    selected: {_source},
+                    onSelectionChanged: (s) => setState(() {
+                      _source = s.first;
+                      _provider = null;
+                      _staff = null;
+                    }),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ClayTextField(
-                    controller: _hoursController,
-                    label: 'Horas / prof. *',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => setState(() {}),
+                  const SizedBox(height: 12),
+                  ClayDropdownField<ServiceType>(
+                    label: 'Categoria / função *',
+                    value: _serviceType,
+                    items: ServiceType.values,
+                    itemLabel: (t) => t.label,
+                    onChanged: (v) => setState(() {
+                      _serviceType = v ?? ServiceType.other;
+                      _provider = null;
+                    }),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ClayTextField(
-                    controller: _rateController,
-                    label: 'Valor/hora (R\$) *',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => setState(() {}),
+                  const SizedBox(height: 12),
+                  if (_source == LaborSource.internalTeam)
+                    staffAsync.when(
+                      data: (list) {
+                        if (list.isEmpty) {
+                          return const Text(
+                            'Nenhum funcionário interno cadastrado neste condomínio.',
+                            style: TextStyle(fontSize: 12, color: ClayTokens.textMuted),
+                          );
+                        }
+                        final items = [null, ...list];
+                        return ClayDropdownField<InternalStaffOption?>(
+                          label: 'Funcionário',
+                          value: _staff,
+                          items: items,
+                          itemLabel: (s) => s == null ? 'Selecionar…' : '${s.fullName} (${s.roleLabel})',
+                          onChanged: (v) => setState(() {
+                            _staff = v;
+                            if (v != null) _workerNameController.text = v.fullName;
+                          }),
+                        );
+                      },
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, _) => const SizedBox.shrink(),
+                    )
+                  else
+                    providersAsync.when(
+                      data: (list) {
+                        if (list.isEmpty) {
+                          return const Text(
+                            'Nenhum prestador cadastrado para esta categoria.',
+                            style: TextStyle(fontSize: 12, color: ClayTokens.textMuted),
+                          );
+                        }
+                        final items = [null, ...list];
+                        return ClayDropdownField<ProviderPickerOption?>(
+                          label: 'Prestador contratado',
+                          value: _provider,
+                          items: items,
+                          itemLabel: (p) => p?.label ?? 'Selecionar…',
+                          onChanged: (v) => setState(() {
+                            _provider = v;
+                            if (v != null) _workerNameController.text = v.label;
+                          }),
+                        );
+                      },
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, _) => const SizedBox.shrink(),
+                    ),
+                  const SizedBox(height: 12),
+                  ClayTextField(
+                    controller: _workerNameController,
+                    label: 'Nome / equipe *',
+                    hint: 'Ex.: Equipe elétrica João, Pedreiros Silva',
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ClayTextField(
-                    controller: _travelController,
-                    label: 'Deslocamento (R\$)',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => setState(() {}),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClayTextField(
+                          controller: _workerCountController,
+                          label: 'Nº profissionais *',
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ClayTextField(
+                          controller: _hoursController,
+                          label: 'Horas / prof. *',
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClayTextField(
+                          controller: _rateController,
+                          label: 'Valor/hora (R\$) *',
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ClayTextField(
+                          controller: _travelController,
+                          label: 'Deslocamento (R\$)',
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClaySurface(
+                    depth: ClayDepth.pressed,
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Resumo', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        Text('Homem hora: ${currency.format(_previewLabor)}'),
+                        Text(
+                          'Total: ${currency.format(_previewTotal)}',
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: ClayTokens.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ClayTextField(controller: _notesController, label: 'Observações', maxLines: 2),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'HH: ${currency.format(_previewLabor)} · Total: ${currency.format(_previewTotal)}',
-              style: const TextStyle(fontWeight: FontWeight.w600, color: ClayTokens.primary),
-            ),
-            const SizedBox(height: 12),
-            ClayTextField(controller: _notesController, label: 'Observações', maxLines: 2),
-            const SizedBox(height: 16),
-            ClayButton(
-              label: 'Confirmar lançamento',
-              icon: Icons.check_rounded,
-              isLoading: _loading,
-              onPressed: _loading ? null : _submit,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          ClayButton(
+            label: 'Confirmar lançamento',
+            icon: Icons.check_rounded,
+            isLoading: _loading,
+            onPressed: _loading ? null : _submit,
+          ),
+        ],
       ),
     );
   }

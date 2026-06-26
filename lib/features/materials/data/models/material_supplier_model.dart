@@ -20,6 +20,12 @@ class MaterialSupplierModel {
           providerId: id,
           displayName: label,
           isPrimary: item['is_primary'] as bool? ?? false,
+          lastPurchaseAt: item['last_purchase_at'] != null
+              ? DateTime.parse(item['last_purchase_at'] as String)
+              : null,
+          lastUnitCost: _toDoubleOrNull(item['last_unit_cost']),
+          lastPurchaseQuantity: _toDoubleOrNull(item['last_purchase_quantity']),
+          lastResaleUnitPrice: _toDoubleOrNull(item['last_resale_unit_price']),
         ),
       );
     }
@@ -172,5 +178,11 @@ class MaterialSupplierModel {
   static String? _trimOrNull(String? v) {
     final t = v?.trim();
     return t == null || t.isEmpty ? null : t;
+  }
+
+  static double? _toDoubleOrNull(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
   }
 }

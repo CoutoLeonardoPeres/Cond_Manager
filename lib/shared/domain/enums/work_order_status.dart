@@ -24,6 +24,10 @@ enum WorkOrderStatus {
     );
   }
 
+  /// Status final que exige admin/gerente para nova alteração.
+  bool get isLockedForNonManagers =>
+      this == WorkOrderStatus.completed || this == WorkOrderStatus.cancelled;
+
   bool get isTerminal => switch (this) {
         WorkOrderStatus.completed ||
         WorkOrderStatus.rejected ||
@@ -32,4 +36,13 @@ enum WorkOrderStatus {
           true,
         _ => false,
       };
+
+  /// Fluxo operacional principal (chamado + campo).
+  static const operationalStatuses = [
+    WorkOrderStatus.open,
+    WorkOrderStatus.waitingMaterial,
+    WorkOrderStatus.inProgress,
+    WorkOrderStatus.completed,
+    WorkOrderStatus.cancelled,
+  ];
 }

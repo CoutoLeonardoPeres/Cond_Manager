@@ -9,6 +9,16 @@ import 'package:cond_manager/shared/domain/enums/organization_role.dart';
 import 'package:cond_manager/shared/domain/enums/user_role.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+class _ActorContext {
+  const _ActorContext({
+    required this.isPlatformAdmin,
+    this.organizationRole,
+  });
+
+  final bool isPlatformAdmin;
+  final OrganizationRole? organizationRole;
+}
+
 class UsersRepositoryImpl implements UsersRepository {
   UsersRepositoryImpl(this._client);
 
@@ -48,7 +58,7 @@ class UsersRepositoryImpl implements UsersRepository {
     try {
       var query = _client.from('company_memberships').select('''
             id, company_id, role, status,
-            profiles ( id, email, full_name, phone, status ),
+            profiles ( id, email, full_name, phone, status, is_platform_admin ),
             management_companies ( legal_name, trade_name )
           ''');
 
@@ -96,6 +106,7 @@ class UsersRepositoryImpl implements UsersRepository {
           fullName: profile['full_name'] as String,
           phone: profile['phone'] as String?,
           status: profile['status'] as String? ?? 'active',
+          isPlatformAdmin: profile['is_platform_admin'] as bool? ?? false,
           membershipId: map['id'] as String,
           companyId: map['company_id'] as String,
           companyName: companyName,
@@ -130,7 +141,7 @@ class UsersRepositoryImpl implements UsersRepository {
           .from('company_memberships')
           .select('''
             id, company_id, role, status,
-            profiles!inner ( id, email, full_name, phone, status ),
+            profiles!inner ( id, email, full_name, phone, status, is_platform_admin ),
             management_companies ( legal_name, trade_name )
           ''')
           .eq('user_id', profileId)
@@ -171,6 +182,7 @@ class UsersRepositoryImpl implements UsersRepository {
           fullName: profile['full_name'] as String,
           phone: profile['phone'] as String?,
           status: profile['status'] as String? ?? 'active',
+          isPlatformAdmin: profile['is_platform_admin'] as bool? ?? false,
           membershipId: map['id'] as String,
           companyId: map['company_id'] as String,
           companyName: companyName,
@@ -194,14 +206,24 @@ class UsersRepositoryImpl implements UsersRepository {
         return const Failure(AppAuthException('Usuário não autenticado.'));
       }
 
+      final guard = await _assertCanAssignRole(input.organizationRole);
+      if (guard != null) return Failure(guard);
+
       final existing = await _client
           .from('profiles')
-          .select('id')
+          .select('id, is_platform_admin')
           .eq('email', input.email.trim().toLowerCase())
           .maybeSingle();
 
       if (existing != null) {
         final pid = existing['id'] as String;
+        final targetGuard = await _assertCanManageTarget(
+          profileId: pid,
+          companyId: input.companyId,
+          newRole: input.organizationRole,
+          targetIsPlatformAdmin: existing['is_platform_admin'] as bool? ?? false,
+        );
+        if (targetGuard != null) return Failure(targetGuard);
         await _client.from('company_memberships').upsert({
           'user_id': pid,
           'company_id': input.companyId,
@@ -274,6 +296,16 @@ class UsersRepositoryImpl implements UsersRepository {
     required String status,
   }) async {
     try {
+      final guard = await _assertCanAssignRole(organizationRole);
+      if (guard != null) return Failure(guard);
+
+      final targetGuard = await _assertCanManageTarget(
+        profileId: profileId,
+        companyId: companyId,
+        newRole: organizationRole,
+      );
+      if (targetGuard != null) return Failure(targetGuard);
+
       await _client.from('profiles').update({
         'full_name': fullName.trim(),
         'phone': phone?.trim(),
@@ -308,6 +340,12 @@ class UsersRepositoryImpl implements UsersRepository {
   @override
   Future<Result<void>> deactivateUser(String profileId, String companyId) async {
     try {
+      final targetGuard = await _assertCanManageTarget(
+        profileId: profileId,
+        companyId: companyId,
+      );
+      if (targetGuard != null) return Failure(targetGuard);
+
       await _client.from('company_memberships').update({
         'status': EntityStatus.inactive.value,
       }).eq('user_id', profileId).eq('company_id', companyId);
@@ -344,6 +382,100 @@ class UsersRepositoryImpl implements UsersRepository {
         'status': EntityStatus.active.value,
       }, onConflict: 'user_id,condominium_id,role');
     }
+  }
+
+  Future<_ActorContext> _loadActorContext() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw const AppAuthException('Usuário não autenticado.');
+    }
+
+    final profile = await _client
+        .from('profiles')
+        .select('is_platform_admin')
+        .eq('id', userId)
+        .single();
+
+    final membership = await _client
+        .from('company_memberships')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('status', EntityStatus.active.value)
+        .order('created_at')
+        .limit(1)
+        .maybeSingle();
+
+    return _ActorContext(
+      isPlatformAdmin: profile['is_platform_admin'] as bool? ?? false,
+      organizationRole: membership != null
+          ? OrganizationRole.fromValue(membership['role'] as String)
+          : null,
+    );
+  }
+
+  Future<PermissionException?> _assertCanAssignRole(OrganizationRole role) async {
+    final actor = await _loadActorContext();
+    if (actor.isPlatformAdmin) return null;
+    if (actor.organizationRole == OrganizationRole.manager) {
+      if (role == OrganizationRole.manager) {
+        return const PermissionException(
+          'Apenas o administrador pode cadastrar gerentes.',
+        );
+      }
+      return null;
+    }
+    return const PermissionException('Sem permissão para gerenciar usuários.');
+  }
+
+  Future<PermissionException?> _assertCanManageTarget({
+    required String profileId,
+    required String companyId,
+    OrganizationRole? newRole,
+    bool? targetIsPlatformAdmin,
+  }) async {
+    final actor = await _loadActorContext();
+    if (actor.isPlatformAdmin) return null;
+
+    final isAdmin = targetIsPlatformAdmin ??
+        await _loadTargetIsPlatformAdmin(profileId);
+    if (isAdmin) {
+      return const PermissionException(
+        'Apenas o administrador pode gerenciar administradores.',
+      );
+    }
+
+    final membership = await _client
+        .from('company_memberships')
+        .select('role')
+        .eq('user_id', profileId)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+    final currentRole = membership != null
+        ? OrganizationRole.fromValue(membership['role'] as String)
+        : null;
+
+    if (currentRole == OrganizationRole.manager) {
+      return const PermissionException(
+        'Apenas o administrador pode alterar gerentes.',
+      );
+    }
+
+    final roleToAssign = newRole ?? currentRole;
+    if (roleToAssign != null) {
+      return _assertCanAssignRole(roleToAssign);
+    }
+
+    return null;
+  }
+
+  Future<bool> _loadTargetIsPlatformAdmin(String profileId) async {
+    final row = await _client
+        .from('profiles')
+        .select('is_platform_admin')
+        .eq('id', profileId)
+        .maybeSingle();
+    return row?['is_platform_admin'] as bool? ?? false;
   }
 
   Future<({bool emailSent, String? emailError})> _sendInviteEmail({

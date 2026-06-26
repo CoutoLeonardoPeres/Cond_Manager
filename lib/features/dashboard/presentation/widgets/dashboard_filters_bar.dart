@@ -32,13 +32,12 @@ class DashboardFiltersBar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Filtros',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: ClayTokens.primary,
-            ),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: ClayTokens.primary,
+                ),
           ),
           const SizedBox(height: 10),
           if (condominiums.length > 1) ...[
@@ -282,11 +281,10 @@ class _FilterChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Text(
             label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? ClayTokens.primary : ClayTokens.textSecondary,
-            ),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? ClayTokens.primary : ClayTokens.textSecondary,
+                ),
           ),
         ),
       ),

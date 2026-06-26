@@ -55,10 +55,8 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
   bool _isLoading = false;
   String? _error;
   bool _loaded = false;
-  bool _addressCepLoading = false;
 
   late final AddressFields _addressFields;
-  late final AddressCepAutofill _addressCepAutofill;
 
   @override
   void initState() {
@@ -75,25 +73,10 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       city: _cityController,
       state: _stateController,
     );
-    _addressCepAutofill = AddressCepAutofill(
-      _addressFields,
-      onLoadingChanged: (v) => setState(() => _addressCepLoading = v),
-      onNotFound: () {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('CEP não encontrado.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-    );
-    _addressCepAutofill.attach();
   }
 
   @override
   void dispose() {
-    _addressCepAutofill.detach();
     _legalNameController.dispose();
     _tradeNameController.dispose();
     _documentController.dispose();
@@ -124,7 +107,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
     _specialties = Set<ServiceType>.from(p.specialties);
     ClayMaskedField.setPhone(_phoneController, p.phones.isNotEmpty ? p.phones.first : null);
     _emailController.text = p.emails.isNotEmpty ? p.emails.first : '';
-    _addressCepAutofill.pause();
+    _addressFields.pauseCepLookup();
     ClayMaskedField.setCep(_zipController, p.zipCode);
     _streetController.text = p.street ?? '';
     _numberController.text = p.number ?? '';
@@ -132,7 +115,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
     _neighborhoodController.text = p.neighborhood ?? '';
     _cityController.text = p.city ?? '';
     _stateController.text = p.state ?? '';
-    _addressCepAutofill.resume();
+    _addressFields.resumeCepLookup();
     _notesController.text = p.notes ?? '';
     for (final c in condos) {
       if (c.id == p.condominiumId) {
@@ -466,7 +449,6 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                   title: 'Endereço (opcional)',
                   fields: _addressFields,
                   streetLabel: 'Logradouro',
-                  cepLoading: _addressCepLoading,
                 ),
                 const SizedBox(height: 16),
                 FormGridSection(

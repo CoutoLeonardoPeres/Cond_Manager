@@ -1,5 +1,6 @@
 import 'package:cond_manager/core/providers/supabase_provider.dart';
 import 'package:cond_manager/features/tickets/data/repositories/ticket_repository_impl.dart';
+import 'package:cond_manager/features/tickets/domain/entities/status_change_log.dart';
 import 'package:cond_manager/features/tickets/domain/entities/ticket.dart';
 import 'package:cond_manager/features/tickets/domain/repositories/ticket_repository.dart';
 import 'package:cond_manager/shared/domain/enums/ticket_status.dart';
@@ -42,6 +43,16 @@ final ticketInteractionsProvider =
   );
 });
 
+final ticketStatusChangesProvider =
+    FutureProvider.autoDispose.family<List<StatusChangeLog>, String>((ref, ticketId) async {
+  final repo = ref.watch(ticketRepositoryProvider);
+  final result = await repo.listStatusChanges(ticketId);
+  return result.when(
+    success: (list) => list,
+    failure: (e) => throw e,
+  );
+});
+
 final ticketAttachmentsProvider =
     FutureProvider.autoDispose.family<List<TicketAttachment>, String>((ref, ticketId) async {
   final repo = ref.watch(ticketRepositoryProvider);
@@ -73,10 +84,4 @@ final ticketCommonAreasProvider =
 });
 
 /// Statuses disponíveis para filtro rápido na listagem.
-final ticketFilterStatuses = [
-  null,
-  TicketStatus.open,
-  TicketStatus.inAnalysis,
-  TicketStatus.waitingInfo,
-  TicketStatus.resolved,
-];
+final ticketFilterStatuses = [null, ...TicketStatus.displayOrder];

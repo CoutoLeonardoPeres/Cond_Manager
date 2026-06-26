@@ -4,6 +4,8 @@ import 'package:cond_manager/features/condominiums/presentation/providers/condom
 import 'package:cond_manager/features/tickets/domain/entities/ticket.dart';
 import 'package:cond_manager/features/tickets/presentation/providers/ticket_providers.dart';
 import 'package:cond_manager/features/tickets/presentation/widgets/ticket_status_chip.dart';
+import 'package:cond_manager/shared/domain/priority_level_style.dart';
+import 'package:cond_manager/shared/widgets/priority_badge.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -213,9 +215,14 @@ class _TicketTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final priorityColors = PriorityLevelStyle.colors(ticket.priority);
+
     return ClayCard(
       onTap: onTap,
+      radius: ClayTokens.radiusCard,
       padding: const EdgeInsets.all(16),
+      backgroundColor: priorityColors.cardBackground,
+      glass: false,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -223,10 +230,11 @@ class _TicketTile extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: ClayTokens.secondary.withValues(alpha: 0.15),
+              color: priorityColors.iconBackground,
               borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+              border: Border.all(color: priorityColors.accent.withValues(alpha: 0.25)),
             ),
-            child: const Icon(Icons.support_agent_rounded, color: ClayTokens.secondary),
+            child: Icon(Icons.support_agent_rounded, color: priorityColors.accent),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -255,13 +263,13 @@ class _TicketTile extends StatelessWidget {
                   children: [
                     TicketStatusChip(status: ticket.status),
                     const SizedBox(width: 12),
-                    TicketPriorityBadge(priority: ticket.priority),
+                    PriorityBadge(priority: ticket.priority),
                   ],
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: ClayTokens.textMuted),
+          Icon(Icons.chevron_right_rounded, color: priorityColors.accent.withValues(alpha: 0.5)),
         ],
       ),
     );

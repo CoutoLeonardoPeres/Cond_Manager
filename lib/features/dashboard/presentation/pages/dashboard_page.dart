@@ -75,16 +75,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               children: [
                 ClaySurface(
                   depth: ClayDepth.floating,
-                  radius: ClayTokens.radiusLg,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      ClayTokens.primary.withValues(alpha: 0.12),
-                      ClayTokens.secondary.withValues(alpha: 0.08),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(24),
+                  radius: ClayTokens.radiusHero,
+                  glass: true,
+                  padding: const EdgeInsets.all(28),
                   child: Row(
                     children: [
                       Expanded(
@@ -94,7 +87,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                             Text(
                               'Olá, ${profile.fullName}!',
                               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w900,
                                     letterSpacing: -0.6,
                                   ),
                             ),
@@ -114,13 +107,20 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                         ),
                       ),
                       Container(
-                        width: 56,
-                        height: 56,
+                        width: 60,
+                        height: 60,
                         decoration: BoxDecoration(
                           gradient: ClayTokens.primaryGradient,
-                          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                          borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+                          boxShadow: [
+                            BoxShadow(
+                              color: ClayTokens.accent.withValues(alpha: 0.35),
+                              offset: const Offset(0, 8),
+                              blurRadius: 20,
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.waving_hand_rounded, color: Colors.white),
+                        child: const Icon(Icons.waving_hand_rounded, color: Colors.white, size: 30),
                       ),
                     ],
                   ),
@@ -200,7 +200,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   icon: Icons.support_agent_rounded,
                   title: 'Chamados',
                   subtitle: 'Abrir, acompanhar e converter em ordem de serviço',
-                  iconColor: ClayTokens.warning,
+                  gradientIndex: 5,
                   onTap: () => context.go('/tickets'),
                 ),
                 const SizedBox(height: 12),
@@ -208,7 +208,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   icon: Icons.assignment_rounded,
                   title: 'Ordens de serviço',
                   subtitle: 'Criar OS, materiais, fotos e encerramento',
-                  iconColor: ClayTokens.primary,
+                  gradientIndex: 1,
                   onTap: () => context.go('/work-orders'),
                 ),
                 const SizedBox(height: 12),
@@ -216,7 +216,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   icon: Icons.apartment_rounded,
                   title: 'Condomínios',
                   subtitle: 'Cadastro e vínculos de usuários',
-                  iconColor: ClayTokens.secondary,
+                  gradientIndex: 3,
                   onTap: () => context.go('/condominiums'),
                 ),
               ],
@@ -261,27 +261,31 @@ class _StatsGrid extends StatelessWidget {
               value: _formatCount(stats.openTicketsCount),
               icon: Icons.support_agent_rounded,
               accentColor: ClayTokens.warning,
+              gradientIndex: 5,
               onTap: () => context.go('/tickets'),
             ),
             ClayStatCard(
               title: 'OS ativas',
               value: _formatCount(stats.activeWorkOrdersCount),
               icon: Icons.assignment_rounded,
-              accentColor: ClayTokens.primary,
+              accentColor: ClayTokens.accent,
+              gradientIndex: 1,
               onTap: () => context.go('/work-orders'),
             ),
             ClayStatCard(
               title: 'Preventivas vencendo',
               value: _formatCount(stats.preventiveDueCount),
               icon: Icons.event_repeat_rounded,
-              accentColor: ClayTokens.secondary,
+              accentColor: ClayTokens.tertiary,
+              gradientIndex: 4,
               onTap: () => context.go('/preventive'),
             ),
             ClayStatCard(
               title: 'Estoque baixo',
               value: _formatCount(stats.lowStockCount),
               icon: Icons.inventory_2_rounded,
-              accentColor: ClayTokens.accent,
+              accentColor: ClayTokens.accentAlt,
+              gradientIndex: 2,
               onTap: () => context.go('/materials'),
             ),
           ],

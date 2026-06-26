@@ -1,4 +1,5 @@
 import 'package:cond_manager/core/router/app_router.dart';
+import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -16,6 +17,13 @@ class CondManagerApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: router,
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(textScaler: AppTypography.contentTextScaler),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [Locale('pt', 'BR')],
       localizationsDelegates: const [

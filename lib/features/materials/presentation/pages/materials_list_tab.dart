@@ -68,7 +68,7 @@ class MaterialsListTab extends ConsumerWidget {
                             m.itemType.label,
                             if (m.suppliersLabel != null) m.suppliersLabel!,
                             if (m.isStorable)
-                              'Estoque: ${m.currentStock} ${m.unitOfMeasure}',
+                              'Estoque: ${m.currentStock} ${m.unitOfMeasureLabel}',
                             'Repasse: ${currency.format(m.resaleUnitPriceWithTax)}',
                           ].join(' · '),
                           onTap: canEdit
@@ -91,7 +91,14 @@ class MaterialsListTab extends ConsumerWidget {
               label: 'Novo item',
               expand: false,
               icon: Icons.add_rounded,
-              onPressed: () => context.go('/materials/new'),
+              onPressed: () {
+                final condoId = ref.read(materialListFilterProvider).condominiumId;
+                final uri = Uri(
+                  path: '/materials/new',
+                  queryParameters: condoId != null ? {'condominiumId': condoId} : null,
+                );
+                context.go(uri.toString());
+              },
             ),
           ),
       ],

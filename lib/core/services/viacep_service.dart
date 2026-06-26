@@ -19,6 +19,7 @@ class ViaCepAddress {
   final String? state;
 }
 
+/// Consulta CEP na base dos Correios (serviço público ViaCEP).
 class ViaCepService {
   ViaCepService._();
 

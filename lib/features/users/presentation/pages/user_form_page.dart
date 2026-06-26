@@ -6,6 +6,7 @@ import 'package:cond_manager/features/condominiums/domain/entities/condominium.d
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/features/users/domain/entities/organization_user.dart';
 import 'package:cond_manager/features/users/presentation/providers/users_providers.dart';
+import 'package:cond_manager/features/users/presentation/utils/user_management_permissions.dart';
 import 'package:cond_manager/shared/domain/enums/organization_role.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,12 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
     }
     if (_role == OrganizationRole.client && _condominiumIds.isEmpty) {
       setState(() => _error = 'Selecione ao menos um condomínio para o cliente.');
+      return;
+    }
+
+    final perms = ref.read(currentProfileProvider).value?.permissions;
+    if (perms == null || !perms.canAssignOrganizationRole(_role)) {
+      setState(() => _error = 'Você não pode atribuir este papel.');
       return;
     }
 
@@ -212,11 +219,16 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(currentProfileProvider).value;
+    final perms = profile.permissions;
+    final assignableRoles = perms.assignableOrganizationRoles;
     final companiesAsync = ref.watch(managementCompaniesProvider);
     final condosAsync = ref.watch(accessibleCondominiumsProvider);
+    OrganizationUser? editingUser;
 
     if (widget.isEditing) {
-      ref.watch(organizationUserDetailProvider(widget.profileId!)).whenData((u) {
+      final detail = ref.watch(organizationUserDetailProvider(widget.profileId!));
+      editingUser = detail.valueOrNull;
+      detail.whenData((u) {
         if (!_loaded) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && !_loaded) {
@@ -246,6 +258,32 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
     }
 
     final condos = condosAsync.value ?? const <Condominium>[];
+    final canEditTarget = !widget.isEditing ||
+        editingUser == null ||
+        perms.canManageOrganizationUser(editingUser);
+    final roleItems = widget.isEditing &&
+            editingUser != null &&
+            editingUser.organizationRole == OrganizationRole.manager &&
+            perms.isAdmin
+        ? OrganizationRole.values
+        : assignableRoles;
+    final selectedRole =
+        roleItems.contains(_role) ? _role : (roleItems.isNotEmpty ? roleItems.first : _role);
+
+    if (widget.isEditing && editingUser != null && !canEditTarget) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            editingUser.isPlatformAdmin
+                ? 'Somente o administrador pode editar administradores.'
+                : 'Somente o administrador pode editar gerentes.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: ClayTokens.textSecondary),
+          ),
+        ),
+      );
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -305,15 +343,19 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
                   items: [
                     FormGridField(
                       span: columns,
-                      child: _RoleInfoCard(role: _role),
+                      child: _RoleInfoCard(role: selectedRole),
                     ),
                     FormGridField(
                       child: ClayDropdownField<OrganizationRole>(
                         label: 'Papel organizacional *',
-                        value: _role,
-                        items: OrganizationRole.values,
+                        value: selectedRole,
+                        items: roleItems,
                         itemLabel: (r) => r.label,
-                        onChanged: (v) => setState(() => _role = v ?? OrganizationRole.analyst),
+                        onChanged: canEditTarget
+                            ? (v) => setState(
+                                  () => _role = v ?? selectedRole,
+                                )
+                            : null,
                       ),
                     ),
                     if (widget.isEditing)
@@ -427,7 +469,10 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
                     runSpacing: 12,
                     alignment: WrapAlignment.end,
                     children: [
-                      if (widget.isEditing && profile?.permissions.canDelete == true)
+                      if (widget.isEditing &&
+                          editingUser != null &&
+                          perms.canManageOrganizationUser(editingUser) &&
+                          profile?.permissions.canDelete == true)
                         SizedBox(
                           width: columns >= 3 ? 200 : double.infinity,
                           child: ClayButton(
@@ -443,7 +488,7 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
                           label: widget.isEditing ? 'Salvar' : 'Convidar / vincular',
                           icon: Icons.save_rounded,
                           isLoading: _loading,
-                          onPressed: _loading ? null : _submit,
+                          onPressed: _loading || !canEditTarget ? null : _submit,
                         ),
                       ),
                     ],

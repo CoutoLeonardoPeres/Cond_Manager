@@ -27,26 +27,41 @@ class AddressFields {
   final TextEditingController neighborhood;
   final TextEditingController city;
   final TextEditingController state;
+
+  AddressCepAutofill? _autofill;
+
+  void _bind(AddressCepAutofill autofill) => _autofill = autofill;
+
+  void pauseCepLookup() => _autofill?.pause();
+
+  void resumeCepLookup() => _autofill?.resume();
+
+  Future<void> lookupCepNow() => _autofill?.lookupNow() ?? Future.value();
 }
 
-/// Busca ViaCEP ao completar 8 dígitos no campo CEP.
+/// Busca endereço na base dos Correios (via ViaCEP) ao completar 8 dígitos no CEP.
 class AddressCepAutofill {
   AddressCepAutofill(
     this.fields, {
     this.onLoadingChanged,
     this.onFilled,
     this.onNotFound,
-  });
+    this.onError,
+  }) {
+    fields._bind(this);
+  }
 
   final AddressFields fields;
   final void Function(bool loading)? onLoadingChanged;
   final void Function()? onFilled;
   final void Function()? onNotFound;
+  final void Function(String message)? onError;
 
   Timer? _debounce;
   int _lookupGeneration = 0;
   bool _loading = false;
   bool _paused = false;
+  String? _lastLookedUpCep;
 
   bool get isLoading => _loading;
 
@@ -63,14 +78,21 @@ class AddressCepAutofill {
 
   void _onZipChanged() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 450), _lookup);
+    final digits = BrazilianInputFormat.digitsOnly(fields.zip.text);
+    if (digits.length < 8) {
+      _lastLookedUpCep = null;
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 350), () => lookupNow());
   }
 
-  Future<void> _lookup() async {
+  /// Dispara busca manual ou automática (Correios / ViaCEP).
+  Future<void> lookupNow() async {
     if (_paused) return;
 
     final digits = BrazilianInputFormat.digitsOnly(fields.zip.text);
     if (digits.length != 8) return;
+    if (_lastLookedUpCep == digits && !_loading) return;
 
     final generation = ++_lookupGeneration;
     _setLoading(true);
@@ -81,27 +103,30 @@ class AddressCepAutofill {
     _setLoading(false);
 
     if (result == null) {
+      _lastLookedUpCep = null;
       onNotFound?.call();
+      onError?.call('CEP não encontrado na base dos Correios.');
       return;
     }
 
-    if (result.street != null && result.street!.isNotEmpty) {
-      fields.street.text = result.street!;
-    }
-    if (result.complement != null && result.complement!.isNotEmpty) {
-      fields.complement.text = result.complement!;
-    }
-    if (result.neighborhood != null && result.neighborhood!.isNotEmpty) {
-      fields.neighborhood.text = result.neighborhood!;
-    }
-    if (result.city != null && result.city!.isNotEmpty) {
-      fields.city.text = result.city!;
-    }
-    if (result.state != null && result.state!.isNotEmpty) {
-      fields.state.text = result.state!;
-    }
-
+    _lastLookedUpCep = digits;
+    _apply(result);
     onFilled?.call();
+  }
+
+  void _apply(ViaCepAddress result) {
+    _setText(fields.street, result.street);
+    if (result.complement != null && result.complement!.isNotEmpty) {
+      _setText(fields.complement, result.complement);
+    }
+    _setText(fields.neighborhood, result.neighborhood);
+    _setText(fields.city, result.city);
+    _setText(fields.state, result.state);
+  }
+
+  void _setText(TextEditingController controller, String? value) {
+    if (value == null || value.isEmpty) return;
+    controller.text = value;
   }
 
   void _setLoading(bool value) {
@@ -111,7 +136,110 @@ class AddressCepAutofill {
   }
 }
 
-/// Seção de endereço com o layout padrão (CEP | Logradouro | Número | Complemento / Bairro | Cidade | Estado).
+/// Seção de endereço com busca automática de CEP (Correios).
+class AddressFormSection extends StatefulWidget {
+  const AddressFormSection({
+    super.key,
+    required this.title,
+    required this.fields,
+    this.cityRequired = false,
+    this.stateRequired = false,
+    this.streetLabel = 'Logradouro',
+    this.zipLabel = 'CEP',
+    this.onCepNotFound,
+    this.onCepFilled,
+    this.showCepFeedback = true,
+  });
+
+  final String title;
+  final AddressFields fields;
+  final bool cityRequired;
+  final bool stateRequired;
+  final String streetLabel;
+  final String zipLabel;
+  final VoidCallback? onCepNotFound;
+  final VoidCallback? onCepFilled;
+  final bool showCepFeedback;
+
+  @override
+  State<AddressFormSection> createState() => _AddressFormSectionState();
+}
+
+class _AddressFormSectionState extends State<AddressFormSection> {
+  late final AddressCepAutofill _autofill;
+  bool _cepLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _autofill = AddressCepAutofill(
+      widget.fields,
+      onLoadingChanged: (v) => setState(() => _cepLoading = v),
+      onNotFound: () {
+        widget.onCepNotFound?.call();
+        if (widget.showCepFeedback && mounted) {
+          _showSnack('CEP não encontrado na base dos Correios.', isError: true);
+        }
+      },
+      onFilled: () {
+        widget.onCepFilled?.call();
+        if (widget.showCepFeedback && mounted) {
+          _showSnack('Endereço preenchido automaticamente.');
+        }
+      },
+    );
+    _autofill.attach();
+  }
+
+  @override
+  void dispose() {
+    _autofill.detach();
+    super.dispose();
+  }
+
+  void _showSnack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: isError ? ClayTokens.error : null,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClaySurface(
+      depth: ClayDepth.raised,
+      radius: ClayTokens.radiusLg,
+      padding: EdgeInsets.all(ClayTokens.gap(18)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            widget.title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: ClayTokens.accent,
+                ),
+          ),
+          SizedBox(height: ClayTokens.gap(14)),
+          AddressFormLayout(
+            fields: widget.fields,
+            cityRequired: widget.cityRequired,
+            stateRequired: widget.stateRequired,
+            streetLabel: widget.streetLabel,
+            zipLabel: widget.zipLabel,
+            cepLoading: _cepLoading,
+            onCepSearch: _autofill.lookupNow,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Atalho — prefira [AddressFormSection].
 Widget buildAddressFormSection({
   required String title,
   required AddressFields fields,
@@ -119,34 +247,18 @@ Widget buildAddressFormSection({
   bool stateRequired = false,
   String streetLabel = 'Logradouro',
   String zipLabel = 'CEP',
-  bool cepLoading = false,
+  VoidCallback? onCepNotFound,
+  bool showCepFeedback = true,
 }) {
-  return ClaySurface(
-    depth: ClayDepth.raised,
-    radius: ClayTokens.radiusLg,
-    padding: const EdgeInsets.all(20),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-            color: ClayTokens.primary,
-          ),
-        ),
-        const SizedBox(height: 16),
-        AddressFormLayout(
-          fields: fields,
-          cityRequired: cityRequired,
-          stateRequired: stateRequired,
-          streetLabel: streetLabel,
-          zipLabel: zipLabel,
-          cepLoading: cepLoading,
-        ),
-      ],
-    ),
+  return AddressFormSection(
+    title: title,
+    fields: fields,
+    cityRequired: cityRequired,
+    stateRequired: stateRequired,
+    streetLabel: streetLabel,
+    zipLabel: zipLabel,
+    onCepNotFound: onCepNotFound,
+    showCepFeedback: showCepFeedback,
   );
 }
 
@@ -160,6 +272,7 @@ class AddressFormLayout extends StatelessWidget {
     this.streetLabel = 'Logradouro',
     this.zipLabel = 'CEP',
     this.cepLoading = false,
+    this.onCepSearch,
   });
 
   final AddressFields fields;
@@ -168,6 +281,7 @@ class AddressFormLayout extends StatelessWidget {
   final String streetLabel;
   final String zipLabel;
   final bool cepLoading;
+  final Future<void> Function()? onCepSearch;
 
   static const _gap = 12.0;
   static const _rowGap = 14.0;
@@ -184,6 +298,7 @@ class AddressFormLayout extends StatelessWidget {
         streetLabel: streetLabel,
         zipLabel: zipLabel,
         cepLoading: cepLoading,
+        onCepSearch: onCepSearch,
       );
     }
 
@@ -217,15 +332,23 @@ class AddressFormLayout extends StatelessWidget {
     );
   }
 
-  Widget? get _cepSuffix {
-    if (!cepLoading) return null;
-    return const SizedBox(
-      width: 22,
-      height: 22,
-      child: Padding(
-        padding: EdgeInsets.all(10),
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
+  Widget _cepSuffix() {
+    if (cepLoading) {
+      return const SizedBox(
+        width: 22,
+        height: 22,
+        child: Padding(
+          padding: EdgeInsets.all(10),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    if (onCepSearch == null) return const SizedBox.shrink();
+    return IconButton(
+      tooltip: 'Buscar CEP nos Correios',
+      icon: const Icon(Icons.search_rounded, size: 20),
+      color: ClayTokens.accent,
+      onPressed: () => onCepSearch!(),
     );
   }
 
@@ -233,7 +356,8 @@ class AddressFormLayout extends StatelessWidget {
         controller: fields.zip,
         label: zipLabel,
         hint: '00000-000',
-        suffixIcon: _cepSuffix,
+        suffixIcon: _cepSuffix(),
+        onComplete: onCepSearch,
       );
 
   Widget _streetField() => ClayTextField(
@@ -294,6 +418,7 @@ class _MobileLayout extends StatelessWidget {
     required this.streetLabel,
     required this.zipLabel,
     required this.cepLoading,
+    this.onCepSearch,
   });
 
   final AddressFields fields;
@@ -302,6 +427,7 @@ class _MobileLayout extends StatelessWidget {
   final String streetLabel;
   final String zipLabel;
   final bool cepLoading;
+  final Future<void> Function()? onCepSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -314,6 +440,13 @@ class _MobileLayout extends StatelessWidget {
           padding: EdgeInsets.all(10),
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
+      );
+    } else if (onCepSearch != null) {
+      cepSuffix = IconButton(
+        tooltip: 'Buscar CEP nos Correios',
+        icon: const Icon(Icons.search_rounded, size: 20),
+        color: ClayTokens.accent,
+        onPressed: () => onCepSearch!(),
       );
     }
 
@@ -329,6 +462,7 @@ class _MobileLayout extends StatelessWidget {
                 label: zipLabel,
                 hint: '00000-000',
                 suffixIcon: cepSuffix,
+                onComplete: onCepSearch,
               ),
             ),
             const SizedBox(width: 12),
@@ -399,10 +533,10 @@ class _MobileLayout extends StatelessWidget {
   }
 }
 
-/// @deprecated Use [buildAddressFormSection]. Mantido para compatibilidade.
+/// @deprecated Use [AddressFormSection]. Mantido para compatibilidade.
 int addressFormColumnsForWidth(double width) => 1;
 
-/// @deprecated Use [buildAddressFormSection].
+/// @deprecated Use [AddressFormSection].
 List<FormGridField> buildAddressFormGrid({
   required AddressFields fields,
   required int columns,

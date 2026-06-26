@@ -92,7 +92,7 @@ class _TicketFormPageState extends ConsumerState<TicketFormPage> {
     final input = TicketCreateInput(
       condominiumId: _condominium!.id,
       locationType: _locationType,
-      unitId: _locationType == LocationType.unit ? _unit?.id : null,
+      unitId: _locationType.requiresUnit ? _unit?.id : null,
       commonAreaId: _locationType == LocationType.commonArea ? _commonArea?.id : null,
       locationDescription: _locationDescController.text,
       serviceType: _serviceType,
@@ -233,13 +233,17 @@ class _TicketFormPageState extends ConsumerState<TicketFormPage> {
       ),
     ];
 
-    if (_locationType == LocationType.unit && _condominium != null) {
+    if (_locationType.requiresUnit && _condominium != null) {
       items.add(
         FormGridField(
           child: unitsAsync.when(
             data: (units) => ClayDropdownField<UnitOption>(
-              label: 'Unidade',
-              hint: units.isEmpty ? 'Nenhuma unidade cadastrada' : 'Selecione',
+              label: _locationType == LocationType.apartment ? 'Apartamento' : 'Unidade',
+              hint: units.isEmpty
+                  ? (_locationType == LocationType.apartment
+                      ? 'Nenhum apartamento cadastrado'
+                      : 'Nenhuma unidade cadastrada')
+                  : 'Selecione',
               value: _unit,
               items: units,
               itemLabel: (u) => u.label,

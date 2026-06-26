@@ -55,10 +55,8 @@ class _MaterialSupplierFormPageState extends ConsumerState<MaterialSupplierFormP
   bool _loading = false;
   String? _error;
   bool _loaded = false;
-  bool _addressCepLoading = false;
 
   late final AddressFields _addressFields;
-  late final AddressCepAutofill _addressCepAutofill;
 
   @override
   void initState() {
@@ -72,25 +70,10 @@ class _MaterialSupplierFormPageState extends ConsumerState<MaterialSupplierFormP
       city: _cityController,
       state: _stateController,
     );
-    _addressCepAutofill = AddressCepAutofill(
-      _addressFields,
-      onLoadingChanged: (v) => setState(() => _addressCepLoading = v),
-      onNotFound: () {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('CEP não encontrado.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-    );
-    _addressCepAutofill.attach();
   }
 
   @override
   void dispose() {
-    _addressCepAutofill.detach();
     _legalNameController.dispose();
     _tradeNameController.dispose();
     _documentController.dispose();
@@ -120,7 +103,7 @@ class _MaterialSupplierFormPageState extends ConsumerState<MaterialSupplierFormP
     _specialties = Set<ServiceType>.from(d.specialties);
     ClayMaskedField.setPhone(_phoneController, d.phones.isNotEmpty ? d.phones.first : null);
     _emailController.text = d.emails.isNotEmpty ? d.emails.first : '';
-    _addressCepAutofill.pause();
+    _addressFields.pauseCepLookup();
     ClayMaskedField.setCep(_zipController, d.zipCode);
     _streetController.text = d.street ?? '';
     _numberController.text = d.number ?? '';
@@ -128,7 +111,7 @@ class _MaterialSupplierFormPageState extends ConsumerState<MaterialSupplierFormP
     _neighborhoodController.text = d.neighborhood ?? '';
     _cityController.text = d.city ?? '';
     _stateController.text = d.state ?? '';
-    _addressCepAutofill.resume();
+    _addressFields.resumeCepLookup();
     _notesController.text = d.notes ?? '';
     _materialIds = Set<String>.from(d.materialIds);
     for (final c in condos) {
@@ -316,7 +299,6 @@ class _MaterialSupplierFormPageState extends ConsumerState<MaterialSupplierFormP
             buildAddressFormSection(
               title: 'Endereço (opcional)',
               fields: _addressFields,
-              cepLoading: _addressCepLoading,
             ),
             const SizedBox(height: 16),
             ServiceSpecialtiesSelector(

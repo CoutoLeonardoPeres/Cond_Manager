@@ -22,10 +22,7 @@ class DashboardStats {
   final int lowStockCount;
 }
 
-bool _isOpenTicket(TicketStatus status) =>
-    status == TicketStatus.open ||
-    status == TicketStatus.inAnalysis ||
-    status == TicketStatus.waitingInfo;
+bool _isOpenTicket(TicketStatus status) => status.isOpenForMetrics;
 
 final dashboardFilterProvider = StateProvider<DashboardFilter>(
   (ref) => DashboardFilter.initial(),

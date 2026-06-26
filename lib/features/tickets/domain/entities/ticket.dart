@@ -25,6 +25,8 @@ class Ticket extends Equatable {
     this.assignedTo,
     this.workOrderId,
     this.resolvedAt,
+    this.analysisStartedAt,
+    this.problemAcceptedAt,
     this.condominiumName,
     this.requesterName,
     this.assigneeName,
@@ -47,6 +49,8 @@ class Ticket extends Equatable {
   final String? assignedTo;
   final String? workOrderId;
   final DateTime? resolvedAt;
+  final DateTime? analysisStartedAt;
+  final DateTime? problemAcceptedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? condominiumName;
@@ -54,6 +58,12 @@ class Ticket extends Equatable {
   final String? assigneeName;
 
   String get displayNumber => 'CH-${ticketNumber.toString().padLeft(5, '0')}';
+
+  bool get needsProblemAcceptance =>
+      status == TicketStatus.inAnalysis && problemAcceptedAt == null;
+
+  bool get canLinkWorkOrder =>
+      problemAcceptedAt != null && workOrderId == null && !status.isTerminal;
 
   @override
   List<Object?> get props => [id, ticketNumber, status, updatedAt];

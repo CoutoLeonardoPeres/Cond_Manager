@@ -1,3 +1,4 @@
+import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/clay_decorations.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:cond_manager/shared/widgets/clay/clay_surface.dart';
@@ -20,20 +21,18 @@ class ClayNavRail extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
       child: ClaySurface(
-        radius: ClayTokens.radiusLg,
+        radius: ClayTokens.radiusXl,
         depth: ClayDepth.floating,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-        child: Column(
-          children: [
-            for (var i = 0; i < items.length; i++) ...[
-              _ClayNavTile(
-                item: items[i],
-                selected: i == selectedIndex,
-                onTap: () => onSelected(i),
-              ),
-              if (i < items.length - 1) const SizedBox(height: 6),
-            ],
-          ],
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        child: ListView.separated(
+          padding: EdgeInsets.zero,
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 4),
+          itemBuilder: (context, i) => _ClayNavTile(
+            item: items[i],
+            selected: i == selectedIndex,
+            onTap: () => onSelected(i),
+          ),
         ),
       ),
     );
@@ -59,7 +58,7 @@ class ClayBottomNav extends StatelessWidget {
       child: ClaySurface(
         radius: ClayTokens.radiusXl,
         depth: ClayDepth.floating,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
@@ -104,24 +103,24 @@ class _ClayNavTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+        borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutCubic,
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 4 : 12,
-            vertical: compact ? 8 : 10,
+            horizontal: compact ? 4 : 14,
+            vertical: compact ? 10 : 12,
           ),
           decoration: selected
               ? BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      ClayTokens.primary.withValues(alpha: 0.18),
-                      ClayTokens.primary.withValues(alpha: 0.08),
+                      ClayTokens.accent.withValues(alpha: 0.2),
+                      ClayTokens.accent.withValues(alpha: 0.08),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
-                  boxShadow: ClayDecorations.insetShadows(depth: 0.6),
+                  borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+                  boxShadow: ClayDecorations.clayPressedShadows(),
                 )
               : null,
           child: compact
@@ -131,17 +130,17 @@ class _ClayNavTile extends StatelessWidget {
                     Icon(
                       item.icon,
                       size: 22,
-                      color: selected ? ClayTokens.primary : ClayTokens.textMuted,
+                      color: selected ? ClayTokens.accent : ClayTokens.muted,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       item.label.split(' ').first,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: AppTypography.body(
                         fontSize: 10,
                         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                        color: selected ? ClayTokens.primary : ClayTokens.textMuted,
+                        color: selected ? ClayTokens.accent : ClayTokens.muted,
                       ),
                     ),
                   ],
@@ -151,16 +150,16 @@ class _ClayNavTile extends StatelessWidget {
                     Icon(
                       item.icon,
                       size: 22,
-                      color: selected ? ClayTokens.primary : ClayTokens.textMuted,
+                      color: selected ? ClayTokens.accent : ClayTokens.muted,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         item.label,
-                        style: TextStyle(
+                        style: AppTypography.body(
                           fontSize: 13,
                           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                          color: selected ? ClayTokens.primary : ClayTokens.textSecondary,
+                          color: selected ? ClayTokens.accent : ClayTokens.muted,
                         ),
                       ),
                     ),

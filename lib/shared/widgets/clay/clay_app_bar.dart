@@ -1,3 +1,4 @@
+import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/clay_decorations.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:cond_manager/shared/widgets/clay/clay_surface.dart';
@@ -23,30 +24,31 @@ class ClayAppBar extends StatelessWidget implements PreferredSizeWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: ClaySurface(
-        radius: ClayTokens.radiusLg,
+        radius: ClayTokens.radiusXl,
         depth: ClayDepth.floating,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
             if (leading != null) leading!,
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 gradient: ClayTokens.primaryGradient,
-                borderRadius: BorderRadius.circular(ClayTokens.radiusXs),
-                boxShadow: ClayDecorations.raisedShadows(depth: 0.5),
+                borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+                boxShadow: ClayDecorations.clayButtonShadows(),
               ),
-              child: const Icon(Icons.apartment_rounded, color: Colors.white, size: 22),
+              child: const Icon(Icons.apartment_rounded, color: Colors.white, size: 24),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
+                style: AppTypography.heading(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: ClayTokens.foreground,
+                ),
               ),
             ),
             ...actions,

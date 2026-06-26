@@ -7,14 +7,103 @@ class MaterialSupplierLink extends Equatable {
     required this.providerId,
     required this.displayName,
     this.isPrimary = false,
+    this.lastPurchaseAt,
+    this.lastUnitCost,
+    this.lastPurchaseQuantity,
+    this.lastResaleUnitPrice,
   });
 
   final String providerId;
   final String displayName;
   final bool isPrimary;
+  final DateTime? lastPurchaseAt;
+  final double? lastUnitCost;
+  final double? lastPurchaseQuantity;
+  final double? lastResaleUnitPrice;
 
   @override
-  List<Object?> get props => [providerId, isPrimary];
+  List<Object?> get props => [
+        providerId,
+        isPrimary,
+        lastPurchaseAt,
+        lastUnitCost,
+        lastPurchaseQuantity,
+        lastResaleUnitPrice,
+      ];
+}
+
+class MaterialSupplierPurchase extends Equatable {
+  const MaterialSupplierPurchase({
+    required this.id,
+    required this.materialId,
+    required this.providerId,
+    required this.providerName,
+    required this.condominiumId,
+    required this.purchasedAt,
+    required this.quantity,
+    required this.unitCost,
+    required this.purchaseTaxPercent,
+    required this.totalCost,
+    required this.resaleUnitPrice,
+    required this.resaleTaxPercent,
+    this.stockMovementId,
+    this.invoiceNumber,
+    this.notes,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String materialId;
+  final String providerId;
+  final String providerName;
+  final String condominiumId;
+  final DateTime purchasedAt;
+  final double quantity;
+  final double unitCost;
+  final double purchaseTaxPercent;
+  final double totalCost;
+  final double resaleUnitPrice;
+  final double resaleTaxPercent;
+  final String? stockMovementId;
+  final String? invoiceNumber;
+  final String? notes;
+  final DateTime createdAt;
+
+  @override
+  List<Object?> get props => [id];
+}
+
+class MaterialSupplierPurchaseInput extends Equatable {
+  const MaterialSupplierPurchaseInput({
+    required this.materialId,
+    required this.providerId,
+    required this.condominiumId,
+    required this.quantity,
+    required this.unitCost,
+    required this.purchaseTaxPercent,
+    required this.resaleUnitPrice,
+    required this.resaleTaxPercent,
+    this.purchasedAt,
+    this.invoiceNumber,
+    this.notes,
+    this.registerStockEntry = false,
+  });
+
+  final String materialId;
+  final String providerId;
+  final String condominiumId;
+  final double quantity;
+  final double unitCost;
+  final double purchaseTaxPercent;
+  final double resaleUnitPrice;
+  final double resaleTaxPercent;
+  final DateTime? purchasedAt;
+  final String? invoiceNumber;
+  final String? notes;
+  final bool registerStockEntry;
+
+  @override
+  List<Object?> get props => [materialId, providerId, quantity];
 }
 
 class MaterialSupplierListItem extends Equatable {

@@ -2,10 +2,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cond_manager/core/router/navigation_helpers.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/work_orders/presentation/utils/work_order_permissions.dart';
+import 'package:cond_manager/features/tickets/domain/entities/ticket.dart';
 import 'package:cond_manager/features/tickets/presentation/providers/ticket_providers.dart';
 import 'package:cond_manager/features/tickets/presentation/utils/ticket_permissions.dart';
+import 'package:cond_manager/features/tickets/presentation/widgets/status_audit_section.dart';
 import 'package:cond_manager/features/tickets/presentation/widgets/ticket_status_chip.dart';
+import 'package:cond_manager/shared/widgets/priority_badge.dart';
 import 'package:cond_manager/shared/domain/enums/ticket_status.dart';
+import 'package:cond_manager/shared/domain/ticket_workflow.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +30,8 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
   bool _isInternal = false;
   bool _sending = false;
   bool _updatingStatus = false;
+  bool _analysisKickoff = false;
+  bool _leaveDialogOpen = false;
 
   @override
   void dispose() {
@@ -82,13 +88,153 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
     );
   }
 
-  void _goBack(BuildContext context) {
+  Future<void> _kickoffAnalysisIfNeeded(Ticket ticket, bool canManage) async {
+    if (!canManage || _analysisKickoff || ticket.status != TicketStatus.open) return;
+    _analysisKickoff = true;
+    final result = await ref.read(ticketRepositoryProvider).beginAnalysis(widget.ticketId);
+    if (!mounted) return;
+    result.when(
+      success: (_) => ref.invalidate(ticketDetailProvider(widget.ticketId)),
+      failure: (e) {
+        _analysisKickoff = false;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      },
+    );
+  }
+
+  Future<bool> _confirmLeaveIfNeeded(Ticket ticket, bool canManage) async {
+    if (!canManage || !ticket.needsProblemAcceptance || _leaveDialogOpen) {
+      return true;
+    }
+    _leaveDialogOpen = true;
+    final action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar análise'),
+        content: const Text(
+          'Este chamado está em análise. Ele deve ser tratado como problema '
+          'da empresa gestora?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'continue'),
+            child: const Text('Continuar analisando'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'reject'),
+            child: const Text('Não é problema'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'accept'),
+            child: const Text('Aceitar como problema'),
+          ),
+        ],
+      ),
+    );
+    _leaveDialogOpen = false;
+    if (!mounted) return false;
+
+    switch (action) {
+      case 'accept':
+        await _acceptAsProblem(ticket);
+        return true;
+      case 'reject':
+        await _rejectAsProblem();
+        return true;
+      case 'continue':
+      default:
+        return false;
+    }
+  }
+
+  Future<void> _acceptAsProblem(Ticket ticket) async {
+    setState(() => _updatingStatus = true);
+    final result =
+        await ref.read(ticketRepositoryProvider).acceptAsProblem(widget.ticketId);
+    if (!mounted) return;
+    setState(() => _updatingStatus = false);
+    result.when(
+      success: (_) {
+        ref.invalidate(ticketDetailProvider(widget.ticketId));
+        ref.invalidate(ticketStatusChangesProvider(widget.ticketId));
+        _offerCreateWorkOrder(ticket);
+      },
+      failure: (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      },
+    );
+  }
+
+  Future<void> _rejectAsProblem() async {
+    setState(() => _updatingStatus = true);
+    final result =
+        await ref.read(ticketRepositoryProvider).rejectAsProblem(widget.ticketId);
+    if (!mounted) return;
+    setState(() => _updatingStatus = false);
+    result.when(
+      success: (_) {
+        ref.invalidate(ticketDetailProvider(widget.ticketId));
+        ref.invalidate(ticketsListProvider);
+        _goBack(context, skipConfirm: true);
+      },
+      failure: (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      },
+    );
+  }
+
+  Future<void> _offerCreateWorkOrder(Ticket ticket) async {
+    if (!ticket.canLinkWorkOrder) return;
+    final create = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ordem de serviço'),
+        content: const Text('Deseja abrir uma ordem de serviço para este chamado?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Agora não'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Abrir OS'),
+          ),
+        ],
+      ),
+    );
+    if (create == true && mounted) {
+      context.go(
+        Uri(
+          path: '/work-orders/new',
+          queryParameters: {
+            'ticketId': ticket.id,
+            'condominiumId': ticket.condominiumId,
+            'returnTo': '/tickets/${ticket.id}',
+          },
+        ).toString(),
+      );
+    }
+  }
+
+  Future<void> _goBack(BuildContext context, {bool skipConfirm = false}) async {
+    if (!skipConfirm) {
+      final ticket = ref.read(ticketDetailProvider(widget.ticketId)).value;
+      final profile = ref.read(currentProfileProvider).value;
+      if (ticket != null) {
+        final canManage = profile?.canManageTicketIn(ticket.condominiumId) ?? false;
+        final leave = await _confirmLeaveIfNeeded(ticket, canManage);
+        if (!leave) return;
+      }
+    }
+    if (!context.mounted) return;
     context.go(resolveReturnPath(context, fallback: '/tickets'));
   }
 
   @override
   Widget build(BuildContext context) {
     final ticketAsync = ref.watch(ticketDetailProvider(widget.ticketId));
+    final statusChangesAsync = ref.watch(ticketStatusChangesProvider(widget.ticketId));
     final interactionsAsync = ref.watch(ticketInteractionsProvider(widget.ticketId));
     final attachmentsAsync = ref.watch(ticketAttachmentsProvider(widget.ticketId));
     final profileAsync = ref.watch(currentProfileProvider);
@@ -118,7 +264,25 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
         final canManage = profile?.canManageTicketIn(ticket.condominiumId) ?? false;
         final canCreateOs = profile?.canCreateWorkOrdersAnywhere ?? false;
 
-        return SingleChildScrollView(
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _kickoffAnalysisIfNeeded(ticket, canManage),
+        );
+
+        final managedByOs = TicketWorkOrderWorkflow.isManagedByWorkOrder(ticket.workOrderId);
+        final manualStatuses = managedByOs
+            ? <TicketStatus>[]
+            : TicketWorkOrderWorkflow.manualTransitionsFrom(ticket.status);
+
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            final leave = await _confirmLeaveIfNeeded(ticket, canManage);
+            if (leave && context.mounted) {
+              context.go(resolveReturnPath(context, fallback: '/tickets'));
+            }
+          },
+          child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -148,7 +312,7 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  TicketPriorityBadge(priority: ticket.priority),
+                  PriorityBadge(priority: ticket.priority),
                   const SizedBox(width: 16),
                   Text(
                     ticket.serviceType.label,
@@ -170,8 +334,18 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                     if (ticket.locationDescription?.isNotEmpty == true)
                       _InfoRow('Detalhes', ticket.locationDescription!),
                     _InfoRow('Abertura', dateFmt.format(ticket.createdAt.toLocal())),
+                    if (ticket.analysisStartedAt != null)
+                      _InfoRow(
+                        'Em análise desde',
+                        dateFmt.format(ticket.analysisStartedAt!.toLocal()),
+                      ),
+                    if (ticket.problemAcceptedAt != null)
+                      _InfoRow(
+                        'Aceito como problema',
+                        dateFmt.format(ticket.problemAcceptedAt!.toLocal()),
+                      ),
                     if (ticket.resolvedAt != null)
-                      _InfoRow('Resolvido', dateFmt.format(ticket.resolvedAt!.toLocal())),
+                      _InfoRow('Concluído', dateFmt.format(ticket.resolvedAt!.toLocal())),
                     const SizedBox(height: 12),
                     const Text(
                       'Descrição',
@@ -207,7 +381,7 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                           onPressed: () =>
                               context.go('/work-orders/${ticket.workOrderId}'),
                         )
-                      else if (canCreateOs)
+                      else if (canCreateOs && ticket.canLinkWorkOrder)
                         ClayButton(
                           label: 'Gerar ordem de serviço',
                           icon: Icons.assignment_rounded,
@@ -222,9 +396,14 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                             ).toString(),
                           ),
                         )
+                      else if (ticket.workOrderId == null && ticket.problemAcceptedAt == null)
+                        const Text(
+                          'Aceite o chamado como problema na análise para gerar OS.',
+                          style: TextStyle(color: ClayTokens.textSecondary),
+                        )
                       else
                         const Text(
-                          'Sem permissão para gerar OS.',
+                          'OS já vinculada ou sem permissão.',
                           style: TextStyle(color: ClayTokens.textSecondary),
                         ),
                     ],
@@ -243,22 +422,35 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                         'Atualizar status',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: TicketStatus.values
-                            .where((s) => s != ticket.status)
-                            .map(
-                              (status) => ActionChip(
-                                label: Text(status.label),
-                                onPressed: _updatingStatus
-                                    ? null
-                                    : () => _updateStatus(status),
-                              ),
-                            )
-                            .toList(),
-                      ),
+                      if (managedByOs) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Status sincronizado com a ordem de serviço vinculada.',
+                          style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
+                        ),
+                      ] else if (manualStatuses.isEmpty) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Conclua a análise (aceitar ou recusar) para avançar o fluxo.',
+                          style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: manualStatuses
+                              .map(
+                                (status) => ActionChip(
+                                  label: Text(status.label),
+                                  onPressed: _updatingStatus
+                                      ? null
+                                      : () => _updateStatus(status),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
                       if (_updatingStatus)
                         const Padding(
                           padding: EdgeInsets.only(top: 8),
@@ -268,6 +460,11 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                   ),
                 ),
               ],
+              statusChangesAsync.when(
+                data: (changes) => StatusAuditSection(changes: changes),
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
               attachmentsAsync.when(
                 data: (files) {
                   if (files.isEmpty) return const SizedBox.shrink();
@@ -421,6 +618,7 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
               ),
             ],
           ),
+        ),
         );
       },
     );

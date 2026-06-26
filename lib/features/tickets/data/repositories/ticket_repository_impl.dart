@@ -2,7 +2,9 @@ import 'dart:typed_data';
 
 import 'package:cond_manager/core/errors/app_exception.dart' show AppAuthException, AppException, NetworkException, PermissionException;
 import 'package:cond_manager/core/utils/result.dart';
+import 'package:cond_manager/features/tickets/data/models/status_change_log_model.dart';
 import 'package:cond_manager/features/tickets/data/models/ticket_model.dart';
+import 'package:cond_manager/features/tickets/domain/entities/status_change_log.dart';
 import 'package:cond_manager/features/tickets/domain/entities/ticket.dart';
 import 'package:cond_manager/features/tickets/domain/repositories/ticket_repository.dart';
 import 'package:cond_manager/shared/domain/enums/ticket_status.dart';
@@ -101,21 +103,39 @@ class TicketRepositoryImpl implements TicketRepository {
   }
 
   @override
-  Future<Result<Ticket>> updateStatus(String id, TicketStatus status) async {
+  Future<Result<Ticket>> updateStatus(
+    String id,
+    TicketStatus status, {
+    String? notes,
+    Map<String, dynamic> metadata = const {},
+  }) async {
     try {
-      final payload = <String, dynamic>{'status': status.value};
-      if (status == TicketStatus.resolved) {
-        payload['resolved_at'] = DateTime.now().toUtc().toIso8601String();
-      } else if (status != TicketStatus.convertedToOs) {
-        payload['resolved_at'] = null;
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        return const Failure(AppAuthException('Usuário não autenticado.'));
+      }
+      final current = await _fetchTicketRow(id);
+      final from = current['status'] as String;
+      if (from == status.value) {
+        return Success(TicketModel.fromJson(current).toEntity());
       }
 
+      final payload = _statusPayload(status);
       final row = await _client
           .from('tickets')
           .update(payload)
           .eq('id', id)
           .select(_ticketSelect)
           .single();
+
+      await _recordTicketStatusChange(
+        ticketId: id,
+        fromStatus: from,
+        toStatus: status.value,
+        changedBy: userId,
+        notes: notes,
+        metadata: metadata,
+      );
 
       return Success(
         TicketModel.fromJson(row as Map<String, dynamic>).toEntity(),
@@ -124,6 +144,185 @@ class TicketRepositoryImpl implements TicketRepository {
       return Failure(_mapPostgrestError(e));
     } catch (e) {
       return Failure(NetworkException('Erro ao atualizar status: $e'));
+    }
+  }
+
+  @override
+  Future<Result<Ticket>> beginAnalysis(String id) async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        return const Failure(AppAuthException('Usuário não autenticado.'));
+      }
+      final current = await _fetchTicketRow(id);
+      final status = current['status'] as String;
+      if (status != TicketStatus.open.value) {
+        return Success(TicketModel.fromJson(current).toEntity());
+      }
+      final now = DateTime.now().toUtc().toIso8601String();
+      final row = await _client
+          .from('tickets')
+          .update({
+            'status': TicketStatus.inAnalysis.value,
+            'analysis_started_at': now,
+          })
+          .eq('id', id)
+          .select(_ticketSelect)
+          .single();
+
+      await _recordTicketStatusChange(
+        ticketId: id,
+        fromStatus: status,
+        toStatus: TicketStatus.inAnalysis.value,
+        changedBy: userId,
+        notes: 'Chamado aberto para análise',
+      );
+
+      return Success(
+        TicketModel.fromJson(row as Map<String, dynamic>).toEntity(),
+      );
+    } on PostgrestException catch (e) {
+      return Failure(_mapPostgrestError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao iniciar análise: $e'));
+    }
+  }
+
+  @override
+  Future<Result<Ticket>> acceptAsProblem(String id) async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        return const Failure(AppAuthException('Usuário não autenticado.'));
+      }
+      final current = await _fetchTicketRow(id);
+      if (current['problem_accepted_at'] != null) {
+        return Success(TicketModel.fromJson(current).toEntity());
+      }
+      final now = DateTime.now().toUtc().toIso8601String();
+      final row = await _client
+          .from('tickets')
+          .update({'problem_accepted_at': now})
+          .eq('id', id)
+          .select(_ticketSelect)
+          .single();
+
+      await _client
+          .from('ticket_status_durations')
+          .update({'ended_at': now})
+          .eq('ticket_id', id)
+          .isFilter('ended_at', null);
+
+      await _client.from('ticket_status_changes').insert({
+        'ticket_id': id,
+        'from_status': current['status'] as String,
+        'to_status': current['status'] as String,
+        'changed_by': userId,
+        'notes': 'Aceito como problema da gestora — início da métrica de atendimento',
+        'metadata': {'event': 'problem_accepted'},
+      });
+
+      await _client.from('ticket_status_durations').insert({
+        'ticket_id': id,
+        'status': current['status'] as String,
+        'changed_by': userId,
+        'metadata': {'metric': 'problem_accepted'},
+      });
+
+      return Success(
+        TicketModel.fromJson(row as Map<String, dynamic>).toEntity(),
+      );
+    } on PostgrestException catch (e) {
+      return Failure(_mapPostgrestError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao aceitar chamado: $e'));
+    }
+  }
+
+  @override
+  Future<Result<Ticket>> rejectAsProblem(String id, {String? notes}) async {
+    return updateStatus(
+      id,
+      TicketStatus.cancelled,
+      notes: notes ?? 'Não caracterizado como problema da gestora',
+    );
+  }
+
+  @override
+  Future<Result<List<StatusChangeLog>>> listStatusChanges(String ticketId) async {
+    try {
+      final data = await _client
+          .from('ticket_status_changes')
+          .select(
+            '*, changer:profiles!ticket_status_changes_changed_by_fkey(full_name)',
+          )
+          .eq('ticket_id', ticketId)
+          .order('created_at');
+
+      final list = (data as List<dynamic>)
+          .map(
+            (e) => StatusChangeLogModel.fromJson(e as Map<String, dynamic>).toEntity(),
+          )
+          .toList();
+
+      return Success(list);
+    } on PostgrestException catch (e) {
+      return Failure(_mapPostgrestError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao carregar auditoria: $e'));
+    }
+  }
+
+  Map<String, dynamic> _statusPayload(TicketStatus status) {
+    final payload = <String, dynamic>{'status': status.value};
+    final now = DateTime.now().toUtc().toIso8601String();
+    if (status == TicketStatus.completed) {
+      payload['resolved_at'] = now;
+    } else if (status != TicketStatus.inProgress) {
+      payload['resolved_at'] = null;
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> _fetchTicketRow(String id) async {
+    final row = await _client.from('tickets').select().eq('id', id).single();
+    return row as Map<String, dynamic>;
+  }
+
+  Future<void> _recordTicketStatusChange({
+    required String ticketId,
+    required String? fromStatus,
+    required String toStatus,
+    required String changedBy,
+    String? notes,
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    if (fromStatus != null && fromStatus != toStatus) {
+      await _client
+          .from('ticket_status_durations')
+          .update({'ended_at': now})
+          .eq('ticket_id', ticketId)
+          .isFilter('ended_at', null);
+    }
+
+    await _client.from('ticket_status_changes').insert({
+      'ticket_id': ticketId,
+      'from_status': fromStatus,
+      'to_status': toStatus,
+      'changed_by': changedBy,
+      'notes': notes,
+      'metadata': metadata,
+    });
+
+    if (fromStatus != toStatus) {
+      await _client.from('ticket_status_durations').insert({
+        'ticket_id': ticketId,
+        'status': toStatus,
+        'changed_by': changedBy,
+        'metadata': metadata,
+      });
     }
   }
 

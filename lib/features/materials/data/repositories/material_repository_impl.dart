@@ -3,11 +3,14 @@ import 'package:cond_manager/core/errors/app_exception.dart'
 import 'package:cond_manager/core/utils/result.dart';
 import 'package:cond_manager/features/materials/data/models/material_model.dart';
 import 'package:cond_manager/features/materials/data/models/material_supplier_model.dart';
+import 'package:cond_manager/features/materials/data/models/material_supplier_purchase_model.dart';
+import 'package:cond_manager/features/materials/domain/default_material_categories.dart';
 import 'package:cond_manager/features/materials/domain/entities/material.dart';
 import 'package:cond_manager/features/materials/domain/entities/material_supplier.dart';
 import 'package:cond_manager/shared/domain/enums/provider_type.dart';
 import 'package:cond_manager/features/materials/domain/repositories/material_repository.dart';
 import 'package:cond_manager/shared/domain/enums/entity_status.dart';
+import 'package:cond_manager/shared/domain/enums/stock_movement_type.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MaterialRepositoryImpl implements MaterialRepository {
@@ -161,6 +164,44 @@ class MaterialRepositoryImpl implements MaterialRepository {
       return Failure(_mapError(e));
     } catch (e) {
       return Failure(NetworkException('Erro ao criar categoria: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<MaterialCategory>>> ensureDefaultCategories(
+    String condominiumId,
+  ) async {
+    try {
+      final existing = await listCategories(condominiumId);
+      final current = existing.when(
+        success: (list) => list,
+        failure: (e) => throw e,
+      );
+      if (current.isNotEmpty) return Success(current);
+
+      final rows = defaultMaterialCategorySeeds
+          .map(
+            (seed) => {
+              'condominium_id': condominiumId,
+              'name': seed.name,
+              'description': seed.description,
+            },
+          )
+          .toList();
+
+      await _client.from('material_categories').upsert(
+            rows,
+            onConflict: 'condominium_id,name',
+            ignoreDuplicates: true,
+          );
+
+      return listCategories(condominiumId);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } on AppException catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(NetworkException('Erro ao carregar categorias padrão: $e'));
     }
   }
 
@@ -445,6 +486,7 @@ class MaterialRepositoryImpl implements MaterialRepository {
             'quantity': input.quantity,
             'unit_cost': unitCost > 0 ? unitCost : null,
             'total_cost': totalCost > 0 ? totalCost : null,
+            'provider_id': input.providerId,
             'reference_type': input.referenceType,
             'reference_id': input.referenceId,
             'notes': input.notes?.trim(),
@@ -460,6 +502,119 @@ class MaterialRepositoryImpl implements MaterialRepository {
       return Failure(_mapError(e));
     } catch (e) {
       return Failure(NetworkException('Erro ao registrar movimentação: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<MaterialSupplierPurchase>>> listSupplierPurchases(
+    String materialId, {
+    String? providerId,
+  }) async {
+    try {
+      var query = _client
+          .from('material_supplier_purchases')
+          .select(MaterialSupplierPurchaseModel.selectQuery)
+          .eq('material_id', materialId);
+
+      if (providerId != null) {
+        query = query.eq('provider_id', providerId);
+      }
+
+      final data = await query.order('purchased_at', ascending: false);
+
+      final list = (data as List<dynamic>)
+          .map(
+            (e) => MaterialSupplierPurchaseModel.fromJson(
+              e as Map<String, dynamic>,
+            ).toEntity(),
+          )
+          .toList();
+
+      return Success(list);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar compras do fornecedor: $e'));
+    }
+  }
+
+  @override
+  Future<Result<MaterialSupplierPurchase>> recordSupplierPurchase(
+    MaterialSupplierPurchaseInput input,
+  ) async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        return const Failure(AppAuthException('Usuário não autenticado.'));
+      }
+
+      final totalCost = input.unitCost * input.quantity;
+      String? stockMovementId;
+
+      if (input.registerStockEntry) {
+        final movementResult = await createStockMovement(
+          StockMovementInput(
+            materialId: input.materialId,
+            condominiumId: input.condominiumId,
+            movementType: StockMovementType.entry,
+            quantity: input.quantity,
+            unitCost: input.unitCost,
+            providerId: input.providerId,
+            notes: input.notes,
+          ),
+        );
+
+        final movement = movementResult.when(
+          success: (m) => m,
+          failure: (e) => throw e,
+        );
+        stockMovementId = movement.id;
+
+        final existing = await _client
+            .from('material_supplier_purchases')
+            .select(MaterialSupplierPurchaseModel.selectQuery)
+            .eq('stock_movement_id', stockMovementId)
+            .maybeSingle();
+
+        if (existing != null) {
+          return Success(
+            MaterialSupplierPurchaseModel.fromJson(
+              existing as Map<String, dynamic>,
+            ).toEntity(),
+          );
+        }
+      }
+
+      final row = await _client
+          .from('material_supplier_purchases')
+          .insert({
+            'material_id': input.materialId,
+            'provider_id': input.providerId,
+            'condominium_id': input.condominiumId,
+            'purchased_at': (input.purchasedAt ?? DateTime.now()).toUtc().toIso8601String(),
+            'quantity': input.quantity,
+            'unit_cost': input.unitCost,
+            'purchase_tax_percent': input.purchaseTaxPercent,
+            'total_cost': totalCost,
+            'resale_unit_price': input.resaleUnitPrice,
+            'resale_tax_percent': input.resaleTaxPercent,
+            'stock_movement_id': stockMovementId,
+            'invoice_number': input.invoiceNumber?.trim(),
+            'notes': input.notes?.trim(),
+            'created_by': userId,
+          })
+          .select(MaterialSupplierPurchaseModel.selectQuery)
+          .single();
+
+      return Success(
+        MaterialSupplierPurchaseModel.fromJson(row as Map<String, dynamic>).toEntity(),
+      );
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } on AppException catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(NetworkException('Erro ao registrar compra: $e'));
     }
   }
 

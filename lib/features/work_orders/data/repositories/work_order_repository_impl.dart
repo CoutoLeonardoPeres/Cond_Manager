@@ -13,9 +13,12 @@ import 'package:cond_manager/features/work_orders/domain/repositories/work_order
 import 'package:cond_manager/shared/domain/enums/entity_status.dart';
 import 'package:cond_manager/shared/domain/enums/stock_movement_type.dart';
 import 'package:cond_manager/shared/utils/material_pricing.dart';
+import 'package:cond_manager/features/tickets/domain/entities/status_change_log.dart';
+import 'package:cond_manager/features/work_orders/data/models/work_order_status_change_model.dart';
 import 'package:cond_manager/shared/domain/enums/ticket_status.dart';
 import 'package:cond_manager/shared/domain/enums/work_order_status.dart';
 import 'package:cond_manager/shared/domain/enums/user_role.dart';
+import 'package:cond_manager/shared/domain/ticket_workflow.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WorkOrderRepositoryImpl implements WorkOrderRepository {
@@ -103,10 +106,20 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
       final workOrder = WorkOrderModel.fromJson(row as Map<String, dynamic>).toEntity();
 
       if (input.ticketId != null) {
+        final userId = _client.auth.currentUser?.id;
         await _client.from('tickets').update({
           'work_order_id': workOrder.id,
-          'status': TicketStatus.convertedToOs.value,
         }).eq('id', input.ticketId!);
+        if (userId != null) {
+          await _client.from('ticket_status_changes').insert({
+            'ticket_id': input.ticketId!,
+            'from_status': TicketStatus.inAnalysis.value,
+            'to_status': TicketStatus.inAnalysis.value,
+            'changed_by': userId,
+            'notes': 'Ordem de serviço ${workOrder.displayNumber} vinculada',
+            'metadata': {'work_order_id': workOrder.id},
+          });
+        }
       }
 
       return Success(workOrder);
@@ -118,8 +131,47 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
   }
 
   @override
-  Future<Result<WorkOrder>> updateStatus(String id, WorkOrderStatus status) async {
+  Future<Result<WorkOrder>> updateStatus(
+    String id,
+    WorkOrderStatus status, {
+    String? notes,
+    Map<String, dynamic> metadata = const {},
+  }) async {
     try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        return const Failure(AppAuthException('Usuário não autenticado.'));
+      }
+
+      final currentRow = await _client
+          .from('work_orders')
+          .select('status, ticket_id, condominium_id')
+          .eq('id', id)
+          .single();
+      final currentMap = currentRow as Map<String, dynamic>;
+      final fromStatusRaw = currentMap['status'] as String;
+      final ticketId = currentMap['ticket_id'] as String?;
+      final condominiumId = currentMap['condominium_id'] as String;
+
+      final fromStatus = WorkOrderStatus.fromValue(fromStatusRaw);
+      if (fromStatus.isLockedForNonManagers && fromStatus.value != status.value) {
+        final allowed = await _canOverrideTerminalWorkOrderStatus(condominiumId);
+        if (!allowed) {
+          return const Failure(
+            PermissionException(
+              'Apenas administrador ou gerente pode alterar o status de uma OS concluída ou cancelada.',
+            ),
+          );
+        }
+      }
+
+      if (fromStatusRaw == status.value) {
+        final row = await _client.from('work_orders').select(_select).eq('id', id).single();
+        return Success(
+          WorkOrderModel.fromJson(row as Map<String, dynamic>).toEntity(),
+        );
+      }
+
       final payload = <String, dynamic>{'status': status.value};
       final now = DateTime.now().toUtc().toIso8601String();
 
@@ -138,6 +190,48 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
           .select(_select)
           .single();
 
+      await _recordWorkOrderStatusChange(
+        workOrderId: id,
+        fromStatus: fromStatusRaw,
+        toStatus: status.value,
+        changedBy: userId,
+        notes: notes,
+        metadata: metadata,
+      );
+
+      if (ticketId != null) {
+        final ticketStatus = TicketWorkOrderWorkflow.ticketStatusFromWorkOrder(status);
+        if (ticketStatus != null) {
+          final ticketPayload = <String, dynamic>{'status': ticketStatus.value};
+          if (ticketStatus == TicketStatus.completed) {
+            ticketPayload['resolved_at'] = now;
+          }
+          await _client.from('tickets').update(ticketPayload).eq('id', ticketId);
+
+          await _client.from('ticket_status_changes').insert({
+            'ticket_id': ticketId,
+            'from_status': null,
+            'to_status': ticketStatus.value,
+            'changed_by': userId,
+            'notes': 'Sincronizado com OS — ${status.label}',
+            'metadata': {'work_order_id': id, 'sync': true},
+          });
+
+          await _client
+              .from('ticket_status_durations')
+              .update({'ended_at': now})
+              .eq('ticket_id', ticketId)
+              .isFilter('ended_at', null);
+
+          await _client.from('ticket_status_durations').insert({
+            'ticket_id': ticketId,
+            'status': ticketStatus.value,
+            'changed_by': userId,
+            'metadata': metadata,
+          });
+        }
+      }
+
       return Success(
         WorkOrderModel.fromJson(row as Map<String, dynamic>).toEntity(),
       );
@@ -145,6 +239,69 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
       return Failure(_mapError(e));
     } catch (e) {
       return Failure(NetworkException('Erro ao atualizar status: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<StatusChangeLog>>> listStatusChanges(String workOrderId) async {
+    try {
+      final data = await _client
+          .from('work_order_status_changes')
+          .select(
+            '*, changer:profiles!work_order_status_changes_changed_by_fkey(full_name)',
+          )
+          .eq('work_order_id', workOrderId)
+          .order('created_at', ascending: false);
+
+      final list = (data as List<dynamic>)
+          .map(
+            (e) =>
+                WorkOrderStatusChangeModel.fromJson(e as Map<String, dynamic>).toEntity(),
+          )
+          .toList();
+
+      return Success(list);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao carregar auditoria da OS: $e'));
+    }
+  }
+
+  Future<void> _recordWorkOrderStatusChange({
+    required String workOrderId,
+    required String? fromStatus,
+    required String toStatus,
+    required String changedBy,
+    String? notes,
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    if (fromStatus != null && fromStatus != toStatus) {
+      await _client
+          .from('work_order_status_durations')
+          .update({'ended_at': now})
+          .eq('work_order_id', workOrderId)
+          .isFilter('ended_at', null);
+    }
+
+    await _client.from('work_order_status_changes').insert({
+      'work_order_id': workOrderId,
+      'from_status': fromStatus,
+      'to_status': toStatus,
+      'changed_by': changedBy,
+      'notes': notes,
+      'metadata': metadata,
+    });
+
+    if (fromStatus != toStatus) {
+      await _client.from('work_order_status_durations').insert({
+        'work_order_id': workOrderId,
+        'status': toStatus,
+        'changed_by': changedBy,
+        'metadata': metadata,
+      });
     }
   }
 
@@ -196,11 +353,8 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
           .select('id, ticket_number, title')
           .eq('condominium_id', condominiumId)
           .isFilter('work_order_id', null)
-          .inFilter('status', [
-            'open',
-            'in_analysis',
-            'waiting_info',
-          ])
+          .inFilter('status', ['in_analysis'])
+          .not('problem_accepted_at', 'is', null)
           .order('created_at', ascending: false);
 
       final list = (data as List<dynamic>).map((raw) {
@@ -548,6 +702,18 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
     await _client.from('work_orders').update({
       'actual_cost': material + labor + travel,
     }).eq('id', workOrderId);
+  }
+
+  Future<bool> _canOverrideTerminalWorkOrderStatus(String condominiumId) async {
+    try {
+      final result = await _client.rpc(
+        'can_override_terminal_work_order_status',
+        params: {'p_condominium_id': condominiumId},
+      );
+      return result == true;
+    } catch (_) {
+      return false;
+    }
   }
 
   AppException _mapError(PostgrestException e) {
