@@ -141,6 +141,10 @@ class _PeriodNavigator extends StatelessWidget {
           Expanded(
             child: DropdownButtonFormField<int>(
               initialValue: filter.effectiveYear,
+              borderRadius: BorderRadius.circular(24),
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              elevation: 12,
+              menuMaxHeight: 320,
               decoration: const InputDecoration(
                 isDense: true,
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),

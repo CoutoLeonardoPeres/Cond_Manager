@@ -4,6 +4,7 @@ import 'package:cond_manager/shared/domain/enums/rental_charge_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_charge_type.dart';
 import 'package:cond_manager/shared/domain/enums/rental_lease_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
+import 'package:cond_manager/shared/domain/enums/rental_party_category.dart';
 import 'package:cond_manager/shared/domain/enums/rental_property_type.dart';
 import 'package:equatable/equatable.dart';
 
@@ -82,6 +83,9 @@ class RentalPropertyInput extends Equatable {
     this.ownerPartyId,
     this.addressStreet,
     this.addressNumber,
+    this.addressBuilding,
+    this.addressBlock,
+    this.addressApartment,
     this.addressNeighborhood,
     this.addressCity,
     this.addressState,
@@ -106,6 +110,9 @@ class RentalPropertyInput extends Equatable {
   final String? ownerPartyId;
   final String? addressStreet;
   final String? addressNumber;
+  final String? addressBuilding;
+  final String? addressBlock;
+  final String? addressApartment;
   final String? addressNeighborhood;
   final String? addressCity;
   final String? addressState;
@@ -127,6 +134,7 @@ class RentalPartyInput extends Equatable {
   const RentalPartyInput({
     required this.companyId,
     required this.fullName,
+    required this.category,
     this.email,
     this.phone,
     this.documentNumber,
@@ -136,6 +144,7 @@ class RentalPartyInput extends Equatable {
 
   final String companyId;
   final String fullName;
+  final RentalPartyCategory category;
   final String? email;
   final String? phone;
   final String? documentNumber;
@@ -143,7 +152,7 @@ class RentalPartyInput extends Equatable {
   final String status;
 
   @override
-  List<Object?> get props => [fullName, companyId];
+  List<Object?> get props => [fullName, companyId, category];
 }
 
 class RentalLeaseInput extends Equatable {

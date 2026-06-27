@@ -6,6 +6,9 @@ import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart'
 import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_party.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_inclusion_catalog_item.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_inclusion.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_photo.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property_pnl.dart';
 import 'package:cond_manager/features/rental/domain/repositories/rental_repository.dart';
 import 'package:cond_manager/shared/domain/enums/rental_booking_channel.dart';
@@ -13,9 +16,12 @@ import 'package:cond_manager/shared/domain/enums/rental_booking_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_charge_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_charge_type.dart';
 import 'package:cond_manager/shared/domain/enums/rental_lease_status.dart';
+import 'package:cond_manager/shared/domain/enums/rental_inclusion_category.dart';
 import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
+import 'package:cond_manager/shared/domain/enums/rental_party_category.dart';
 import 'package:cond_manager/shared/domain/enums/rental_property_type.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 class RentalRepositoryImpl implements RentalRepository {
   RentalRepositoryImpl(this._client);
@@ -24,9 +30,9 @@ class RentalRepositoryImpl implements RentalRepository {
 
   static const _propertySelect = '''
     id, company_id, condominium_id, owner_party_id, property_type, listing_mode,
-    code, title, description, address_street, address_number, address_neighborhood,
-    address_city, address_state, address_zip, area_sqm, bedrooms, bathrooms, max_guests,
-    base_rent_amount, base_daily_rate, deposit_amount, status,
+    code, title, description, address_street, address_number, address_building, address_block,
+    address_apartment, address_neighborhood, address_city, address_state, address_zip, area_sqm,
+    bedrooms, bathrooms, max_guests, base_rent_amount, base_daily_rate, deposit_amount, status,
     condominiums ( name )
   ''';
 
@@ -113,11 +119,218 @@ class RentalRepositoryImpl implements RentalRepository {
   }
 
   @override
+  Future<Result<List<RentalPropertyInclusion>>> listPropertyInclusions(String propertyId) async {
+    try {
+      final data = await _client
+          .from('rental_property_inclusions')
+          .select()
+          .eq('property_id', propertyId)
+          .order('sort_order')
+          .order('created_at');
+      return Success(
+        (data as List).map((e) => _inclusionFromMap(e as Map<String, dynamic>)).toList(),
+      );
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar itens inclusos: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> replacePropertyInclusions(
+    String propertyId,
+    String companyId,
+    List<RentalPropertyInclusionInput> items,
+  ) async {
+    try {
+      await _client.from('rental_property_inclusions').delete().eq('property_id', propertyId);
+
+      if (items.isEmpty) return const Success(null);
+
+      final rows = items.asMap().entries.map((entry) {
+        final i = entry.value;
+        final index = entry.key;
+        return {
+          'company_id': companyId,
+          'property_id': propertyId,
+          'category': i.category.value,
+          'catalog_item_id': i.catalogItemId,
+          'custom_name': i.customName?.trim(),
+          'amount': i.amount,
+          'included_in_rent': i.includedInRent,
+          'quantity': i.quantity,
+          'size_label': i.sizeLabel?.trim(),
+          'model': i.model?.trim(),
+          'chair_count': i.chairCount,
+          'notes': i.notes?.trim(),
+          'sort_order': i.sortOrder != 0 ? i.sortOrder : index,
+        };
+      }).toList();
+
+      await _client.from('rental_property_inclusions').insert(rows);
+      return const Success(null);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao salvar itens inclusos: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<RentalInclusionCatalogItem>>> listInclusionCatalog(String companyId) async {
+    try {
+      final data = await _client
+          .from('rental_inclusion_catalog')
+          .select()
+          .eq('company_id', companyId)
+          .eq('is_active', true)
+          .order('name');
+      return Success(
+        (data as List).map((e) => _catalogFromMap(e as Map<String, dynamic>)).toList(),
+      );
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar catálogo: $e'));
+    }
+  }
+
+  @override
+  Future<Result<RentalInclusionCatalogItem>> createInclusionCatalogItem(
+    RentalInclusionCatalogInput input,
+  ) async {
+    try {
+      final data = await _client
+          .from('rental_inclusion_catalog')
+          .insert({
+            'company_id': input.companyId,
+            'name': input.name.trim(),
+            'category': input.category.value,
+            'default_amount': input.defaultAmount,
+          })
+          .select()
+          .single();
+      return Success(_catalogFromMap(data as Map<String, dynamic>));
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao cadastrar item no catálogo: $e'));
+    }
+  }
+
+  static const _photosBucket = 'rental-properties';
+
+  @override
+  Future<Result<List<RentalPropertyPhoto>>> listPropertyPhotos(String propertyId) async {
+    try {
+      final data = await _client
+          .from('rental_property_photos')
+          .select()
+          .eq('property_id', propertyId)
+          .order('sort_order')
+          .order('created_at');
+
+      final photos = <RentalPropertyPhoto>[];
+      for (final raw in data as List<dynamic>) {
+        final map = raw as Map<String, dynamic>;
+        var url = map['file_url'] as String? ?? '';
+        final path = map['file_path'] as String? ?? '';
+        if (path.isNotEmpty) {
+          url = await _client.storage.from(_photosBucket).createSignedUrl(path, 3600);
+        }
+        photos.add(_photoFromMap(map, fileUrl: url));
+      }
+      return Success(photos);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar fotos: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> uploadPropertyPhotos({
+    required String propertyId,
+    required String companyId,
+    required List<PendingRentalPropertyPhoto> files,
+    int sortOffset = 0,
+  }) async {
+    if (files.isEmpty) return const Success(null);
+
+    try {
+      final userId = _client.auth.currentUser?.id;
+      const uuid = Uuid();
+
+      for (var i = 0; i < files.length; i++) {
+        final file = files[i];
+        final safeName = file.fileName.replaceAll(RegExp(r'[^\w.\-]'), '_');
+        final path = '$companyId/$propertyId/${uuid.v4()}_$safeName';
+
+        await _client.storage.from(_photosBucket).uploadBinary(
+              path,
+              file.bytes,
+              fileOptions: FileOptions(contentType: file.mimeType, upsert: false),
+            );
+
+        final signedUrl = await _client.storage.from(_photosBucket).createSignedUrl(path, 86400);
+
+        await _client.from('rental_property_photos').insert({
+          'company_id': companyId,
+          'property_id': propertyId,
+          'file_url': signedUrl,
+          'file_path': path,
+          'file_name': file.fileName,
+          'mime_type': file.mimeType,
+          'sort_order': sortOffset + i,
+          if (userId != null) 'uploaded_by': userId,
+        });
+      }
+
+      return const Success(null);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao enviar fotos: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> deletePropertyPhotos(List<String> photoIds) async {
+    if (photoIds.isEmpty) return const Success(null);
+
+    try {
+      final data = await _client
+          .from('rental_property_photos')
+          .select('id, file_path')
+          .inFilter('id', photoIds);
+
+      final paths = (data as List<dynamic>)
+          .map((e) => (e as Map<String, dynamic>)['file_path'] as String)
+          .where((p) => p.isNotEmpty)
+          .toList();
+
+      if (paths.isNotEmpty) {
+        await _client.storage.from(_photosBucket).remove(paths);
+      }
+
+      await _client.from('rental_property_photos').delete().inFilter('id', photoIds);
+      return const Success(null);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao remover fotos: $e'));
+    }
+  }
+
+  @override
   Future<Result<List<RentalParty>>> listParties() async {
     try {
       final data = await _client
           .from('rental_parties')
-          .select('id, company_id, full_name, email, phone, document_number, notes, status')
+          .select(
+            'id, company_id, full_name, category, email, phone, document_number, notes, status',
+          )
           .order('full_name')
           .limit(300);
       return Success((data as List).map((e) => _partyFromMap(e as Map<String, dynamic>)).toList());
@@ -155,6 +368,7 @@ class RentalRepositoryImpl implements RentalRepository {
       final row = {
         'company_id': input.companyId,
         'full_name': input.fullName.trim(),
+        'category': input.category.value,
         'email': input.email?.trim(),
         'phone': input.phone?.trim(),
         'document_number': input.documentNumber?.trim(),
@@ -516,6 +730,9 @@ class RentalRepositoryImpl implements RentalRepository {
         'owner_party_id': input.ownerPartyId,
         'address_street': input.addressStreet?.trim(),
         'address_number': input.addressNumber?.trim(),
+        'address_building': input.addressBuilding?.trim(),
+        'address_block': input.addressBlock?.trim(),
+        'address_apartment': input.addressApartment?.trim(),
         'address_neighborhood': input.addressNeighborhood?.trim(),
         'address_city': input.addressCity?.trim(),
         'address_state': input.addressState?.trim(),
@@ -545,6 +762,9 @@ class RentalRepositoryImpl implements RentalRepository {
       description: map['description'] as String?,
       addressStreet: map['address_street'] as String?,
       addressNumber: map['address_number'] as String?,
+      addressBuilding: map['address_building'] as String?,
+      addressBlock: map['address_block'] as String?,
+      addressApartment: map['address_apartment'] as String?,
       addressNeighborhood: map['address_neighborhood'] as String?,
       addressCity: map['address_city'] as String?,
       addressState: map['address_state'] as String?,
@@ -560,10 +780,50 @@ class RentalRepositoryImpl implements RentalRepository {
     );
   }
 
+  RentalPropertyPhoto _photoFromMap(Map<String, dynamic> map, {required String fileUrl}) =>
+      RentalPropertyPhoto(
+        id: map['id'] as String,
+        companyId: map['company_id'] as String,
+        propertyId: map['property_id'] as String,
+        fileUrl: fileUrl,
+        filePath: map['file_path'] as String,
+        fileName: map['file_name'] as String?,
+        mimeType: map['mime_type'] as String?,
+        sortOrder: map['sort_order'] as int? ?? 0,
+      );
+
+  RentalPropertyInclusion _inclusionFromMap(Map<String, dynamic> map) => RentalPropertyInclusion(
+        id: map['id'] as String,
+        companyId: map['company_id'] as String,
+        propertyId: map['property_id'] as String,
+        category: RentalInclusionCategory.fromValue(map['category'] as String),
+        catalogItemId: map['catalog_item_id'] as String?,
+        customName: map['custom_name'] as String?,
+        amount: _toDouble(map['amount']),
+        includedInRent: map['included_in_rent'] as bool? ?? false,
+        quantity: map['quantity'] as int?,
+        sizeLabel: map['size_label'] as String?,
+        model: map['model'] as String?,
+        chairCount: map['chair_count'] as int?,
+        notes: map['notes'] as String?,
+        sortOrder: map['sort_order'] as int? ?? 0,
+      );
+
+  RentalInclusionCatalogItem _catalogFromMap(Map<String, dynamic> map) =>
+      RentalInclusionCatalogItem(
+        id: map['id'] as String,
+        companyId: map['company_id'] as String,
+        name: map['name'] as String,
+        category: RentalInclusionCategory.fromValue(map['category'] as String),
+        defaultAmount: _toDouble(map['default_amount']),
+        isActive: map['is_active'] as bool? ?? true,
+      );
+
   RentalParty _partyFromMap(Map<String, dynamic> map) => RentalParty(
         id: map['id'] as String,
         companyId: map['company_id'] as String,
         fullName: map['full_name'] as String,
+        category: RentalPartyCategory.fromValue(map['category'] as String? ?? 'tenant'),
         email: map['email'] as String?,
         phone: map['phone'] as String?,
         documentNumber: map['document_number'] as String?,

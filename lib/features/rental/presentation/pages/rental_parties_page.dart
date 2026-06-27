@@ -75,6 +75,7 @@ class RentalPartiesPage extends ConsumerWidget {
                           icon: Icons.person_rounded,
                           title: p.fullName,
                           subtitle: [
+                            p.category.label,
                             if (p.email != null) p.email,
                             if (p.phone != null) p.phone,
                             if (p.documentNumber != null) p.documentNumber,

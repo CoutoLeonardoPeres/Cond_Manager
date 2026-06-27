@@ -5,10 +5,15 @@ import 'package:cond_manager/features/condominiums/presentation/condominium_rout
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_party.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_inclusion.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_photo.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_property_inclusions_editor.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_property_photos_editor.dart';
 import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
 import 'package:cond_manager/shared/domain/enums/rental_property_type.dart';
+import 'package:cond_manager/shared/domain/enums/rental_party_category.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +37,10 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
   final _descriptionController = TextEditingController();
   final _streetController = TextEditingController();
   final _numberController = TextEditingController();
+  final _buildingController = TextEditingController();
+  final _blockController = TextEditingController();
+  final _apartmentController = TextEditingController();
+  final _complementController = TextEditingController();
   final _neighborhoodController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
@@ -52,6 +61,36 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
   bool _loading = false;
   String? _error;
   bool _loaded = false;
+  bool _inclusionsLoaded = false;
+  bool _photosLoaded = false;
+  bool _cepLoading = false;
+  List<RentalPropertyInclusionInput> _inclusions = [];
+  List<RentalPropertyPhotoDraft> _photos = [];
+  List<RentalPropertyPhotoDraft> _initialPhotos = [];
+
+  late final AddressFields _address;
+  late final AddressCepAutofill _cepAutofill;
+
+  @override
+  void initState() {
+    super.initState();
+    _address = AddressFields(
+      zip: _zipController,
+      street: _streetController,
+      number: _numberController,
+      complement: _complementController,
+      neighborhood: _neighborhoodController,
+      city: _cityController,
+      state: _stateController,
+    );
+    _cepAutofill = AddressCepAutofill(
+      _address,
+      onLoadingChanged: (loading) {
+        if (mounted) setState(() => _cepLoading = loading);
+      },
+    );
+    _cepAutofill.attach();
+  }
 
   @override
   void dispose() {
@@ -60,6 +99,10 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
     _descriptionController.dispose();
     _streetController.dispose();
     _numberController.dispose();
+    _buildingController.dispose();
+    _blockController.dispose();
+    _apartmentController.dispose();
+    _complementController.dispose();
     _neighborhoodController.dispose();
     _cityController.dispose();
     _stateController.dispose();
@@ -71,6 +114,7 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
     _baseRentController.dispose();
     _baseDailyController.dispose();
     _depositController.dispose();
+    _cepAutofill.detach();
     super.dispose();
   }
 
@@ -88,12 +132,17 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
     _titleController.text = p.title;
     _codeController.text = p.code ?? '';
     _descriptionController.text = p.description ?? '';
+    _address.pauseCepLookup();
+    ClayMaskedField.setCep(_zipController, p.addressZip);
     _streetController.text = p.addressStreet ?? '';
     _numberController.text = p.addressNumber ?? '';
+    _buildingController.text = p.addressBuilding ?? '';
+    _blockController.text = p.addressBlock ?? '';
+    _apartmentController.text = p.addressApartment ?? '';
     _neighborhoodController.text = p.addressNeighborhood ?? '';
     _cityController.text = p.addressCity ?? '';
     _stateController.text = p.addressState ?? '';
-    _zipController.text = p.addressZip ?? '';
+    _address.resumeCepLookup();
     if (p.areaSqm != null) _areaController.text = p.areaSqm.toString();
     if (p.bedrooms != null) _bedroomsController.text = p.bedrooms.toString();
     if (p.bathrooms != null) _bathroomsController.text = p.bathrooms.toString();
@@ -125,6 +174,11 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
         ownerPartyId: _owner?.id,
         addressStreet: _streetController.text.trim().isEmpty ? null : _streetController.text.trim(),
         addressNumber: _numberController.text.trim().isEmpty ? null : _numberController.text.trim(),
+        addressBuilding:
+            _buildingController.text.trim().isEmpty ? null : _buildingController.text.trim(),
+        addressBlock: _blockController.text.trim().isEmpty ? null : _blockController.text.trim(),
+        addressApartment:
+            _apartmentController.text.trim().isEmpty ? null : _apartmentController.text.trim(),
         addressNeighborhood:
             _neighborhoodController.text.trim().isEmpty ? null : _neighborhoodController.text.trim(),
         addressCity: _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
@@ -157,16 +211,85 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
     final repo = ref.read(rentalRepositoryProvider);
     final input = _buildInput(companyId);
 
+    Future<void> onSaved(RentalProperty property) async {
+      final photoChanges = RentalPropertyPhotosChanges.fromDrafts(
+        current: _photos,
+        initial: _initialPhotos,
+      );
+
+      if (photoChanges.deletedPhotoIds.isNotEmpty) {
+        final delResult = await repo.deletePropertyPhotos(photoChanges.deletedPhotoIds);
+        if (!mounted) return;
+        final delFailed = delResult.when(
+          success: (_) => false,
+          failure: (_) => true,
+        );
+        if (delFailed) {
+          setState(() {
+            _loading = false;
+            _error = 'Imóvel salvo, mas falha ao remover fotos antigas.';
+          });
+          return;
+        }
+      }
+
+      final incResult = await repo.replacePropertyInclusions(
+        property.id,
+        companyId,
+        _inclusions,
+      );
+      if (!mounted) return;
+      var stopAfterInclusions = false;
+      incResult.when(
+        success: (_) {},
+        failure: (e) {
+          stopAfterInclusions = true;
+          setState(() {
+            _loading = false;
+            _error = 'Imóvel salvo, mas falha nos itens inclusos: ${e.message}';
+          });
+        },
+      );
+      if (stopAfterInclusions) return;
+
+      if (photoChanges.pendingUploads.isNotEmpty) {
+        final upResult = await repo.uploadPropertyPhotos(
+          propertyId: property.id,
+          companyId: companyId,
+          files: photoChanges.pendingUploads,
+          sortOffset: photoChanges.existingCount,
+        );
+        if (!mounted) return;
+        var stopAfterUpload = false;
+        upResult.when(
+          success: (_) {},
+          failure: (e) {
+            stopAfterUpload = true;
+            setState(() {
+              _loading = false;
+              _error = 'Imóvel salvo, mas falha ao enviar fotos: ${e.message}';
+            });
+          },
+        );
+        if (stopAfterUpload) return;
+      }
+
+      ref.invalidate(rentalPropertiesListProvider);
+      ref.invalidate(rentalPropertyInclusionsProvider(property.id));
+      ref.invalidate(rentalPropertyPhotosProvider(property.id));
+      if (widget.isEditing) {
+        ref.invalidate(rentalPropertyDetailProvider(widget.propertyId!));
+      }
+      if (!mounted) return;
+      context.go(resolveReturnPath(context, fallback: '/rental/properties'));
+    }
+
     if (widget.isEditing) {
       final result = await repo.updateProperty(widget.propertyId!, input);
       if (!mounted) return;
-      result.when(
-        success: (_) {
-          ref.invalidate(rentalPropertiesListProvider);
-          ref.invalidate(rentalPropertyDetailProvider(widget.propertyId!));
-          context.go(resolveReturnPath(context, fallback: '/rental/properties'));
-        },
-        failure: (e) => setState(() {
+      await result.when(
+        success: onSaved,
+        failure: (e) async => setState(() {
           _loading = false;
           _error = e.message;
         }),
@@ -174,12 +297,9 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
     } else {
       final result = await repo.createProperty(input);
       if (!mounted) return;
-      result.when(
-        success: (_) {
-          ref.invalidate(rentalPropertiesListProvider);
-          context.go(resolveReturnPath(context, fallback: '/rental/properties'));
-        },
-        failure: (e) => setState(() {
+      await result.when(
+        success: onSaved,
+        failure: (e) async => setState(() {
           _loading = false;
           _error = e.message;
         }),
@@ -199,6 +319,32 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
         if (!_loaded) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && !_loaded) setState(() => _fill(p, condos, parties));
+          });
+        }
+      });
+      ref.watch(rentalPropertyInclusionsProvider(widget.propertyId!)).whenData((list) {
+        if (!_inclusionsLoaded) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_inclusionsLoaded) {
+              setState(() {
+                _inclusions = list.map(RentalPropertyInclusionInput.fromEntity).toList();
+                _inclusionsLoaded = true;
+              });
+            }
+          });
+        }
+      });
+      ref.watch(rentalPropertyPhotosProvider(widget.propertyId!)).whenData((list) {
+        if (!_photosLoaded) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_photosLoaded) {
+              final drafts = list.map((p) => RentalPropertyPhotoDraft.existing(p)).toList();
+              setState(() {
+                _photos = drafts;
+                _initialPhotos = drafts;
+                _photosLoaded = true;
+              });
+            }
           });
         }
       });
@@ -339,14 +485,67 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
                       ),
                     ),
                     FormGridField(
+                      span: 2,
                       child: partiesAsync.when(
-                        data: (list) => ClayDropdownField<RentalParty?>(
-                          label: 'Proprietário',
-                          value: _owner,
-                          items: [null, ...list],
-                          itemLabel: (p) => p?.fullName ?? '—',
-                          onChanged: (v) => setState(() => _owner = v),
-                        ),
+                        data: (list) {
+                          final owners = list
+                              .where((p) => p.category == RentalPartyCategory.landlord)
+                              .toList();
+                          final selectedOwner = _owner != null &&
+                                  owners.every((p) => p.id != _owner!.id)
+                              ? _owner
+                              : null;
+                          final dropdownItems = [
+                            null,
+                            if (selectedOwner != null) selectedOwner,
+                            ...owners,
+                          ];
+                          return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ClayDropdownField<RentalParty?>(
+                              label: 'Locador',
+                              hint: owners.isEmpty
+                                  ? 'Cadastre um locador em Pessoas'
+                                  : null,
+                              value: _owner,
+                              items: dropdownItems,
+                              itemLabel: (p) => p?.fullName ?? '—',
+                              onChanged: (v) => setState(() => _owner = v),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Lista pessoas cadastradas como Locador em Locação → Pessoas.',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: ClayTokens.textMuted,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  final returnTo = GoRouterState.of(context).uri.toString();
+                                  final uri = Uri(
+                                    path: '/rental/parties/new',
+                                    queryParameters: {
+                                      'returnTo': returnTo,
+                                      'category': RentalPartyCategory.landlord.value,
+                                    },
+                                  );
+                                  context.go(uri.toString());
+                                },
+                                icon: const Icon(Icons.person_add_rounded, size: 18),
+                                label: Text(
+                                  owners.isEmpty
+                                      ? 'Cadastrar locador'
+                                      : 'Cadastrar novo locador',
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                        },
                         loading: () => const LinearProgressIndicator(),
                         error: (_, _) => const SizedBox.shrink(),
                       ),
@@ -368,17 +567,74 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
                   columns: columns,
                   items: [
                     FormGridField(
+                      child: ClayMaskedField.cep(
+                        controller: _zipController,
+                        label: 'CEP',
+                        suffixIcon: _cepLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: Padding(
+                                  padding: EdgeInsets.all(10),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : IconButton(
+                                tooltip: 'Buscar CEP',
+                                icon: const Icon(Icons.search_rounded, size: 20),
+                                color: ClayTokens.accent,
+                                onPressed: _cepAutofill.lookupNow,
+                              ),
+                        onComplete: _cepAutofill.lookupNow,
+                      ),
+                    ),
+                    FormGridField(
                       span: columns >= 2 ? 2 : 1,
                       child: ClayTextField(controller: _streetController, label: 'Rua'),
                     ),
                     FormGridField(child: ClayTextField(controller: _numberController, label: 'Número')),
                     FormGridField(
+                      child: ClayTextField(controller: _buildingController, label: 'Edifício'),
+                    ),
+                    FormGridField(
+                      child: ClayTextField(controller: _blockController, label: 'Bloco/Torre'),
+                    ),
+                    FormGridField(
+                      child: ClayTextField(controller: _apartmentController, label: 'Apartamento'),
+                    ),
+                    FormGridField(
                       child: ClayTextField(controller: _neighborhoodController, label: 'Bairro'),
                     ),
                     FormGridField(child: ClayTextField(controller: _cityController, label: 'Cidade')),
-                    FormGridField(child: ClayTextField(controller: _stateController, label: 'Estado')),
-                    FormGridField(child: ClayTextField(controller: _zipController, label: 'CEP')),
+                    FormGridField(
+                      child: ClayTextField(
+                        controller: _stateController,
+                        label: 'Estado',
+                        onChanged: (v) {
+                          final upper = v.toUpperCase();
+                          if (upper != v) {
+                            _stateController.value = _stateController.value.copyWith(
+                              text: upper,
+                              selection: TextSelection.collapsed(offset: upper.length),
+                            );
+                          }
+                        },
+                      ),
+                    ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                RentalPropertyInclusionsEditor(
+                  companyId: ref.watch(currentProfileProvider).value?.companyId ?? '',
+                  items: _inclusions,
+                  columns: columns,
+                  onChanged: (items) => setState(() => _inclusions = items),
+                ),
+                const SizedBox(height: 16),
+                RentalPropertyPhotosEditor(
+                  photos: _photos,
+                  enabled: !_loading,
+                  onChanged: (photos) => setState(() => _photos = photos),
                 ),
                 const SizedBox(height: 16),
                 FormGridSection(

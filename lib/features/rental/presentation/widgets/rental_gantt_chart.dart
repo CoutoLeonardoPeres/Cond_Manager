@@ -2,6 +2,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_booking.dart
 import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_gantt_timeline.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_occupancy_view.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +15,7 @@ class RentalGanttChart extends StatefulWidget {
     required this.bookings,
     required this.leases,
     required this.range,
-    this.dayWidth = 26,
+    required this.viewMode,
     this.propertyColumnWidth = 200,
     this.rowHeight = 52,
   });
@@ -23,7 +24,7 @@ class RentalGanttChart extends StatefulWidget {
   final List<RentalBooking> bookings;
   final List<RentalLease> leases;
   final RentalGanttRange range;
-  final double dayWidth;
+  final RentalOccupancyViewMode viewMode;
   final double propertyColumnWidth;
   final double rowHeight;
 
@@ -32,8 +33,6 @@ class RentalGanttChart extends StatefulWidget {
 }
 
 class _RentalGanttChartState extends State<RentalGanttChart> {
-  static const _headerMonthHeight = 30.0;
-  static const _headerDayHeight = 28.0;
   static final _borderColor = ClayTokens.textMuted.withValues(alpha: 0.35);
 
   final _headerHController = ScrollController();
@@ -45,10 +44,6 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
   bool _syncingV = false;
   bool _didInitialScroll = false;
 
-  double get _timelineWidth => widget.range.totalDays * widget.dayWidth;
-
-  double get _headerHeight => _headerMonthHeight + _headerDayHeight;
-
   @override
   void initState() {
     super.initState();
@@ -56,6 +51,15 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
     _bodyHController.addListener(_syncBodyToHeader);
     _bodyVController.addListener(_syncBodyVToLabels);
     _labelsVController.addListener(_syncLabelsToBodyV);
+  }
+
+  @override
+  void didUpdateWidget(covariant RentalGanttChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.viewMode != widget.viewMode ||
+        oldWidget.range.start != widget.range.start) {
+      _didInitialScroll = false;
+    }
   }
 
   @override
@@ -103,168 +107,215 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
     _syncingV = false;
   }
 
-  void _scrollToToday() {
+  void _scrollToToday(double colWidth, int colCount) {
     if (_didInitialScroll || !_bodyHController.hasClients) return;
     _didInitialScroll = true;
-    final todayIndex = rentalGanttDayIndex(widget.range, DateTime.now());
+
+    final today = rentalGanttDateOnly(DateTime.now());
+    double targetIndex;
+    if (widget.viewMode == RentalOccupancyViewMode.year) {
+      if (today.year != widget.range.start.year) return;
+      targetIndex = (today.month - 1).toDouble();
+    } else {
+      final idx = rentalGanttDayIndex(widget.range, today);
+      if (idx < 0 || idx >= colCount) return;
+      targetIndex = idx.toDouble();
+    }
+
     final viewport = _bodyHController.position.viewportDimension;
-    final target = (todayIndex * widget.dayWidth) - (viewport / 2) + (widget.dayWidth / 2);
+    final target = (targetIndex * colWidth) - (viewport / 2) + (colWidth / 2);
     final offset = target.clamp(0.0, _bodyHController.position.maxScrollExtent);
     _bodyHController.jumpTo(offset);
     _headerHController.jumpTo(offset);
   }
 
+  double? _todayMarkerLeft(RentalOccupancyViewMode mode, double colWidth, int colCount) {
+    final today = rentalGanttDateOnly(DateTime.now());
+    if (mode == RentalOccupancyViewMode.year) {
+      if (today.year != widget.range.start.year) return null;
+      return (today.month - 1) * colWidth;
+    }
+    final idx = rentalGanttDayIndex(widget.range, today);
+    if (idx < 0 || idx >= colCount) return null;
+    return idx * colWidth;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final properties = rentalGanttSortedProperties(widget.properties);
-    final monthHeaders = rentalGanttMonthHeaders(widget.range);
-    final todayIndex = rentalGanttDayIndex(widget.range, DateTime.now());
-    final showToday = todayIndex >= 0 && todayIndex < widget.range.totalDays;
-    final bodyHeight = properties.length * widget.rowHeight;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final colWidth = rentalOccupancyColumnWidth(
+          mode: widget.viewMode,
+          viewportWidth: constraints.maxWidth,
+          propertyColumnWidth: widget.propertyColumnWidth,
+        );
+        final colCount = rentalOccupancyColumnCount(widget.viewMode, widget.range);
+        final timelineWidth = colCount * colWidth;
+        final headerHeight = switch (widget.viewMode) {
+          RentalOccupancyViewMode.day => 48.0,
+          RentalOccupancyViewMode.week => 54.0,
+          RentalOccupancyViewMode.month => 58.0,
+          RentalOccupancyViewMode.year => 36.0,
+        };
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToToday());
+        final properties = rentalGanttSortedProperties(widget.properties);
+        final bodyHeight = properties.length * widget.rowHeight;
+        final todayLeft = _todayMarkerLeft(widget.viewMode, colWidth, colCount);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: _headerHeight,
-          child: Row(
-            children: [
-              _CornerCell(
-                width: widget.propertyColumnWidth,
-                height: _headerHeight,
-              ),
-              Expanded(
-                child: ScrollConfiguration(
-                  behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-                  child: SingleChildScrollView(
-                    controller: _headerHController,
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
-                    ),
-                    dragStartBehavior: DragStartBehavior.down,
-                    child: _TimelineHeaderContent(
-                      range: widget.range,
-                      monthHeaders: monthHeaders,
-                      dayWidth: widget.dayWidth,
-                      monthHeight: _headerMonthHeight,
-                      dayHeight: _headerDayHeight,
-                      width: _timelineWidth,
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToToday(colWidth, colCount);
+        });
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: headerHeight,
+              child: Row(
+                children: [
+                  _CornerCell(
+                    width: widget.propertyColumnWidth,
+                    height: headerHeight,
+                  ),
+                  Expanded(
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                      child: SingleChildScrollView(
+                        controller: _headerHController,
+                        scrollDirection: Axis.horizontal,
+                        physics: widget.viewMode == RentalOccupancyViewMode.day
+                            ? const NeverScrollableScrollPhysics()
+                            : const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
+                        child: _OccupancyHeader(
+                          range: widget.range,
+                          viewMode: widget.viewMode,
+                          colWidth: colWidth,
+                          colCount: colCount,
+                          width: timelineWidth,
+                          height: headerHeight,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: widget.propertyColumnWidth,
-                child: ScrollConfiguration(
-                  behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-                  child: ListView.builder(
-                    controller: _labelsVController,
-                    physics: const ClampingScrollPhysics(),
-                    itemCount: properties.length,
-                    itemExtent: widget.rowHeight,
-                    itemBuilder: (_, i) => _PropertyLabel(
-                      property: properties[i],
-                      height: widget.rowHeight,
-                      borderColor: _borderColor,
+            ),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: widget.propertyColumnWidth,
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                      child: ListView.builder(
+                        controller: _labelsVController,
+                        physics: const ClampingScrollPhysics(),
+                        itemCount: properties.length,
+                        itemExtent: widget.rowHeight,
+                        itemBuilder: (_, i) => _PropertyLabel(
+                          property: properties[i],
+                          height: widget.rowHeight,
+                          borderColor: _borderColor,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              Expanded(
-                child: Scrollbar(
-                  controller: _bodyHController,
-                  thumbVisibility: true,
-                  notificationPredicate: (n) => n.metrics.axis == Axis.horizontal,
-                  child: Scrollbar(
-                    controller: _bodyVController,
-                    thumbVisibility: true,
-                    notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return SingleChildScrollView(
-                          controller: _bodyHController,
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(
-                            parent: AlwaysScrollableScrollPhysics(),
-                          ),
-                          dragStartBehavior: DragStartBehavior.down,
-                          child: SizedBox(
-                            width: _timelineWidth,
-                            height: constraints.maxHeight,
-                            child: SingleChildScrollView(
-                              controller: _bodyVController,
-                              physics: const ClampingScrollPhysics(),
-                              child: SizedBox(
-                                height: bodyHeight,
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    _DayGrid(
-                                      range: widget.range,
-                                      dayWidth: widget.dayWidth,
-                                      rowHeight: widget.rowHeight,
-                                      rowCount: properties.length,
-                                      borderColor: _borderColor,
+                  Expanded(
+                    child: Scrollbar(
+                      controller: _bodyHController,
+                      thumbVisibility: widget.viewMode != RentalOccupancyViewMode.day,
+                      notificationPredicate: (n) => n.metrics.axis == Axis.horizontal,
+                      child: Scrollbar(
+                        controller: _bodyVController,
+                        thumbVisibility: true,
+                        notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
+                        child: LayoutBuilder(
+                          builder: (context, bodyConstraints) {
+                            return SingleChildScrollView(
+                              controller: _bodyHController,
+                              scrollDirection: Axis.horizontal,
+                              physics: widget.viewMode == RentalOccupancyViewMode.day
+                                  ? const NeverScrollableScrollPhysics()
+                                  : const BouncingScrollPhysics(
+                                      parent: AlwaysScrollableScrollPhysics(),
                                     ),
-                                    if (showToday)
-                                      Positioned(
-                                        left: todayIndex * widget.dayWidth,
-                                        top: 0,
-                                        bottom: 0,
-                                        child: IgnorePointer(
-                                          child: Container(
-                                            width: 2,
-                                            color: ClayTokens.primary.withValues(alpha: 0.55),
-                                          ),
-                                        ),
-                                      ),
-                                    ...List.generate(properties.length, (row) {
-                                      final property = properties[row];
-                                      final segments = rentalGanttSegmentsForProperty(
-                                        propertyId: property.id,
-                                        bookings: widget.bookings,
-                                        leases: widget.leases,
-                                        range: widget.range,
-                                      );
-                                      return Positioned(
-                                        top: row * widget.rowHeight,
-                                        left: 0,
-                                        width: _timelineWidth,
-                                        height: widget.rowHeight,
-                                        child: _PropertyTimelineRow(
+                              dragStartBehavior: DragStartBehavior.down,
+                              child: SizedBox(
+                                width: timelineWidth,
+                                height: bodyConstraints.maxHeight,
+                                child: SingleChildScrollView(
+                                  controller: _bodyVController,
+                                  physics: const ClampingScrollPhysics(),
+                                  child: SizedBox(
+                                    height: bodyHeight,
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        _OccupancyGrid(
                                           range: widget.range,
-                                          segments: segments,
-                                          dayWidth: widget.dayWidth,
+                                          viewMode: widget.viewMode,
+                                          colWidth: colWidth,
+                                          colCount: colCount,
                                           rowHeight: widget.rowHeight,
-                                          stripe: row.isOdd,
+                                          rowCount: properties.length,
+                                          borderColor: _borderColor,
                                         ),
-                                      );
-                                    }),
-                                  ],
+                                        if (todayLeft != null)
+                                          Positioned(
+                                            left: todayLeft,
+                                            top: 0,
+                                            bottom: 0,
+                                            child: IgnorePointer(
+                                              child: Container(
+                                                width: 2,
+                                                color: ClayTokens.primary.withValues(alpha: 0.55),
+                                              ),
+                                            ),
+                                          ),
+                                        ...List.generate(properties.length, (row) {
+                                          final property = properties[row];
+                                          final segments = rentalGanttSegmentsForProperty(
+                                            propertyId: property.id,
+                                            bookings: widget.bookings,
+                                            leases: widget.leases,
+                                            range: widget.range,
+                                          );
+                                          return Positioned(
+                                            top: row * widget.rowHeight,
+                                            left: 0,
+                                            width: timelineWidth,
+                                            height: widget.rowHeight,
+                                            child: _PropertyTimelineRow(
+                                              range: widget.range,
+                                              viewMode: widget.viewMode,
+                                              segments: segments,
+                                              colWidth: colWidth,
+                                              colCount: colCount,
+                                              rowHeight: widget.rowHeight,
+                                              stripe: row.isOdd,
+                                            ),
+                                          );
+                                        }),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -277,7 +328,6 @@ class _CornerCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final border = ClayTokens.textMuted.withValues(alpha: 0.35);
     return Container(
       width: width,
       height: height,
@@ -286,57 +336,165 @@ class _CornerCell extends StatelessWidget {
       decoration: BoxDecoration(
         color: ClayTokens.surfaceRaised,
         border: Border(
-          bottom: BorderSide(color: border),
-          right: BorderSide(color: border),
+          bottom: BorderSide(color: ClayTokens.textMuted.withValues(alpha: 0.35)),
+          right: BorderSide(color: ClayTokens.textMuted.withValues(alpha: 0.35)),
         ),
       ),
       child: const Text(
         'Imóvel',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          color: ClayTokens.textSecondary,
-        ),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: ClayTokens.textSecondary),
       ),
     );
   }
 }
 
-class _TimelineHeaderContent extends StatelessWidget {
-  const _TimelineHeaderContent({
+class _OccupancyHeader extends StatelessWidget {
+  const _OccupancyHeader({
     required this.range,
-    required this.monthHeaders,
-    required this.dayWidth,
-    required this.monthHeight,
-    required this.dayHeight,
+    required this.viewMode,
+    required this.colWidth,
+    required this.colCount,
     required this.width,
+    required this.height,
   });
 
   final RentalGanttRange range;
-  final List<RentalGanttMonthHeader> monthHeaders;
-  final double dayWidth;
-  final double monthHeight;
-  final double dayHeight;
+  final RentalOccupancyViewMode viewMode;
+  final double colWidth;
+  final int colCount;
   final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    final monthFmt = DateFormat('MMM yyyy', 'pt_BR');
-    final dayFmt = DateFormat('d');
     final border = ClayTokens.textMuted.withValues(alpha: 0.35);
+    final today = rentalGanttDateOnly(DateTime.now());
 
+    Widget cell({
+      required String label,
+      required String? sublabel,
+      required bool highlight,
+      required bool weekend,
+    }) {
+      return Container(
+        width: colWidth,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: highlight
+              ? ClayTokens.primary.withValues(alpha: 0.12)
+              : weekend
+                  ? ClayTokens.surfacePressed.withValues(alpha: 0.45)
+                  : ClayTokens.surfaceRaised,
+          border: Border(
+            right: BorderSide(color: border),
+            bottom: BorderSide(color: border),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (sublabel != null)
+              Text(
+                sublabel,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: highlight ? ClayTokens.primary : ClayTokens.textMuted,
+                ),
+              ),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: viewMode == RentalOccupancyViewMode.day ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: viewMode == RentalOccupancyViewMode.day ? 12 : 10,
+                fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
+                color: highlight ? ClayTokens.primary : ClayTokens.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (viewMode == RentalOccupancyViewMode.year) {
+      final monthFmt = DateFormat('MMM', 'pt_BR');
+      return SizedBox(
+        width: width,
+        height: height,
+        child: Row(
+          children: List.generate(12, (i) {
+            final monthDate = DateTime(range.start.year, i + 1);
+            final isCurrentMonth =
+                today.year == monthDate.year && today.month == monthDate.month;
+            final label = monthFmt.format(monthDate);
+            return cell(
+              label: label[0].toUpperCase() + label.substring(1),
+              sublabel: null,
+              highlight: isCurrentMonth,
+              weekend: false,
+            );
+          }),
+        ),
+      );
+    }
+
+    if (viewMode == RentalOccupancyViewMode.day) {
+      final dayLabel = DateFormat('EEEE', 'pt_BR').format(range.start);
+      final dateLabel = DateFormat('d MMMM yyyy', 'pt_BR').format(range.start);
+      final isToday = range.start == today;
+      return SizedBox(
+        width: width,
+        height: height,
+        child: cell(
+          label: '${dayLabel[0].toUpperCase()}${dayLabel.substring(1)}\n$dateLabel',
+          sublabel: null,
+          highlight: isToday,
+          weekend: range.start.weekday == DateTime.saturday ||
+              range.start.weekday == DateTime.sunday,
+        ),
+      );
+    }
+
+    if (viewMode == RentalOccupancyViewMode.week) {
+      final weekdayFmt = DateFormat('EEE', 'pt_BR');
+      final dayFmt = DateFormat('d');
+      return SizedBox(
+        width: width,
+        height: height,
+        child: Row(
+          children: List.generate(colCount, (i) {
+            final day = range.start.add(Duration(days: i));
+            final isToday = rentalGanttDateOnly(day) == today;
+            final wd = weekdayFmt.format(day);
+            return cell(
+              label: dayFmt.format(day),
+              sublabel: wd[0].toUpperCase() + wd.substring(1),
+              highlight: isToday,
+              weekend: day.weekday == DateTime.saturday || day.weekday == DateTime.sunday,
+            );
+          }),
+        ),
+      );
+    }
+
+    // month
+    final monthHeaders = rentalGanttMonthHeaders(range);
+    final dayFmt = DateFormat('d');
     return SizedBox(
       width: width,
       child: Column(
         children: [
           SizedBox(
-            height: monthHeight,
+            height: 30,
             child: Stack(
               children: [
                 for (final header in monthHeaders)
                   Positioned(
-                    left: header.startDayIndex * dayWidth,
-                    width: header.dayCount * dayWidth,
+                    left: header.startDayIndex * colWidth,
+                    width: header.dayCount * colWidth,
                     top: 0,
                     bottom: 0,
                     child: Container(
@@ -349,11 +507,11 @@ class _TimelineHeaderContent extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        _capitalize(monthFmt.format(DateTime(header.year, header.month))),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                        _capitalize(
+                          DateFormat('MMM yyyy', 'pt_BR')
+                              .format(DateTime(header.year, header.month)),
                         ),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -362,35 +520,17 @@ class _TimelineHeaderContent extends StatelessWidget {
             ),
           ),
           SizedBox(
-            height: dayHeight,
+            height: 28,
             child: Row(
-              children: List.generate(range.totalDays, (i) {
+              children: List.generate(colCount, (i) {
                 final day = range.start.add(Duration(days: i));
-                final isWeekend =
-                    day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
-                final isToday = rentalGanttDateOnly(day) == rentalGanttDateOnly(DateTime.now());
-                return Container(
-                  width: dayWidth,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: isToday
-                        ? ClayTokens.primary.withValues(alpha: 0.12)
-                        : isWeekend
-                            ? ClayTokens.surfacePressed.withValues(alpha: 0.5)
-                            : ClayTokens.surfaceRaised,
-                    border: Border(
-                      right: BorderSide(color: border),
-                      bottom: BorderSide(color: border),
-                    ),
-                  ),
-                  child: Text(
-                    dayFmt.format(day),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
-                      color: isToday ? ClayTokens.primary : ClayTokens.textSecondary,
-                    ),
-                  ),
+                final isToday = rentalGanttDateOnly(day) == today;
+                return cell(
+                  label: dayFmt.format(day),
+                  sublabel: null,
+                  highlight: isToday,
+                  weekend:
+                      day.weekday == DateTime.saturday || day.weekday == DateTime.sunday,
                 );
               }),
             ),
@@ -403,6 +543,62 @@ class _TimelineHeaderContent extends StatelessWidget {
   String _capitalize(String s) {
     if (s.isEmpty) return s;
     return s[0].toUpperCase() + s.substring(1);
+  }
+}
+
+class _OccupancyGrid extends StatelessWidget {
+  const _OccupancyGrid({
+    required this.range,
+    required this.viewMode,
+    required this.colWidth,
+    required this.colCount,
+    required this.rowHeight,
+    required this.rowCount,
+    required this.borderColor,
+  });
+
+  final RentalGanttRange range;
+  final RentalOccupancyViewMode viewMode;
+  final double colWidth;
+  final int colCount;
+  final double rowHeight;
+  final int rowCount;
+  final Color borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(rowCount, (row) {
+        return SizedBox(
+          height: rowHeight,
+          child: Row(
+            children: List.generate(colCount, (i) {
+              var isWeekend = false;
+              if (viewMode != RentalOccupancyViewMode.year) {
+                final day = range.start.add(Duration(days: i));
+                isWeekend =
+                    day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+              }
+              return Container(
+                width: colWidth,
+                decoration: BoxDecoration(
+                  color: row.isOdd
+                      ? ClayTokens.surfacePressed.withValues(alpha: 0.25)
+                      : Colors.transparent,
+                  border: Border(
+                    right: BorderSide(color: borderColor.withValues(alpha: 0.6)),
+                    bottom: BorderSide(color: borderColor.withValues(alpha: 0.6)),
+                  ),
+                ),
+                child: isWeekend
+                    ? ColoredBox(color: ClayTokens.surfacePressed.withValues(alpha: 0.12))
+                    : null,
+              );
+            }),
+          ),
+        );
+      }),
+    );
   }
 }
 
@@ -453,67 +649,22 @@ class _PropertyLabel extends StatelessWidget {
   }
 }
 
-class _DayGrid extends StatelessWidget {
-  const _DayGrid({
-    required this.range,
-    required this.dayWidth,
-    required this.rowHeight,
-    required this.rowCount,
-    required this.borderColor,
-  });
-
-  final RentalGanttRange range;
-  final double dayWidth;
-  final double rowHeight;
-  final int rowCount;
-  final Color borderColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: List.generate(rowCount, (row) {
-        return SizedBox(
-          height: rowHeight,
-          child: Row(
-            children: List.generate(range.totalDays, (i) {
-              final day = range.start.add(Duration(days: i));
-              final isWeekend =
-                  day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
-              return Container(
-                width: dayWidth,
-                decoration: BoxDecoration(
-                  color: row.isOdd
-                      ? ClayTokens.surfacePressed.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  border: Border(
-                    right: BorderSide(color: borderColor.withValues(alpha: 0.6)),
-                    bottom: BorderSide(color: borderColor.withValues(alpha: 0.6)),
-                  ),
-                ),
-                child: isWeekend
-                    ? ColoredBox(color: ClayTokens.surfacePressed.withValues(alpha: 0.15))
-                    : null,
-              );
-            }),
-          ),
-        );
-      }),
-    );
-  }
-}
-
 class _PropertyTimelineRow extends StatelessWidget {
   const _PropertyTimelineRow({
     required this.range,
+    required this.viewMode,
     required this.segments,
-    required this.dayWidth,
+    required this.colWidth,
+    required this.colCount,
     required this.rowHeight,
     required this.stripe,
   });
 
   final RentalGanttRange range;
+  final RentalOccupancyViewMode viewMode;
   final List<RentalGanttSegment> segments;
-  final double dayWidth;
+  final double colWidth;
+  final int colCount;
   final double rowHeight;
   final bool stripe;
 
@@ -525,15 +676,12 @@ class _PropertyTimelineRow extends StatelessWidget {
       children: [
         if (stripe)
           Positioned.fill(
-            child: ColoredBox(
-              color: ClayTokens.surfacePressed.withValues(alpha: 0.08),
-            ),
+            child: ColoredBox(color: ClayTokens.surfacePressed.withValues(alpha: 0.08)),
           ),
         for (final segment in segments)
           Positioned(
-            left: rentalGanttDayIndex(range, segment.start) * dayWidth + 1,
-            width: (segment.end.difference(segment.start).inDays * dayWidth - 2)
-                .clamp(4.0, double.infinity),
+            left: _segmentLeft(segment) + 1,
+            width: _segmentWidth(segment).clamp(4.0, double.infinity),
             top: 8,
             height: rowHeight - 16,
             child: Tooltip(
@@ -577,5 +725,29 @@ class _PropertyTimelineRow extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  double _segmentLeft(RentalGanttSegment segment) {
+    if (viewMode == RentalOccupancyViewMode.year) {
+      final cols = rentalOccupancyYearSegmentColumns(
+        range: range,
+        segmentStart: segment.start,
+        segmentEndExclusive: segment.end,
+      );
+      return cols.$1 * colWidth;
+    }
+    return rentalGanttDayIndex(range, segment.start) * colWidth;
+  }
+
+  double _segmentWidth(RentalGanttSegment segment) {
+    if (viewMode == RentalOccupancyViewMode.year) {
+      final cols = rentalOccupancyYearSegmentColumns(
+        range: range,
+        segmentStart: segment.start,
+        segmentEndExclusive: segment.end,
+      );
+      return (cols.$2 - cols.$1) * colWidth - 2;
+    }
+    return segment.end.difference(segment.start).inDays * colWidth - 2;
   }
 }

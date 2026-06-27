@@ -1,22 +1,23 @@
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_gantt_chart.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_gantt_timeline.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_occupancy_view.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 class RentalCalendarPage extends ConsumerWidget {
   const RentalCalendarPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final range = ref.watch(rentalGanttRangeProvider);
+    final viewMode = ref.watch(rentalOccupancyViewModeProvider);
+    final anchor = ref.watch(rentalOccupancyAnchorProvider);
+    final range = ref.watch(rentalOccupancyRangeProvider);
     final propertiesAsync = ref.watch(rentalPropertiesListProvider);
     final bookingsAsync = ref.watch(rentalGanttBookingsProvider);
     final leasesAsync = ref.watch(rentalGanttLeasesProvider);
-    final rangeLabel =
-        '${DateFormat('MMM/yy', 'pt_BR').format(range.start)} — ${DateFormat('MMM/yy', 'pt_BR').format(range.end.subtract(const Duration(days: 1)))}';
+    final periodLabel = rentalOccupancyPeriodLabel(viewMode, anchor);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -32,27 +33,58 @@ class RentalCalendarPage extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Cada linha é um imóvel. Arraste horizontalmente para navegar pelos meses e dias; '
-                'as barras coloridas indicam períodos ocupados.',
+                'Visualize a ocupação por imóvel. Escolha dia, semana, mês ou ano e navegue pelo período.',
                 style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 520;
+                  if (isWide) {
+                    return SegmentedButton<RentalOccupancyViewMode>(
+                      segments: RentalOccupancyViewMode.values
+                          .map(
+                            (m) => ButtonSegment(
+                              value: m,
+                              label: Text(m.label),
+                              icon: Icon(m.icon, size: 18),
+                            ),
+                          )
+                          .toList(),
+                      selected: {viewMode},
+                      onSelectionChanged: (selected) {
+                        ref.read(rentalOccupancyViewModeProvider.notifier).state = selected.first;
+                      },
+                    );
+                  }
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SegmentedButton<RentalOccupancyViewMode>(
+                      segments: RentalOccupancyViewMode.values
+                          .map((m) => ButtonSegment(value: m, label: Text(m.label)))
+                          .toList(),
+                      selected: {viewMode},
+                      onSelectionChanged: (selected) {
+                        ref.read(rentalOccupancyViewModeProvider.notifier).state = selected.first;
+                      },
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   IconButton(
-                    tooltip: 'Período anterior',
+                    tooltip: rentalOccupancyNavTooltip(viewMode, -1),
                     onPressed: () {
-                      final r = ref.read(rentalGanttRangeProvider);
-                      ref.read(rentalGanttRangeProvider.notifier).state = RentalGanttRange(
-                        start: DateTime(r.start.year, r.start.month - 6, 1),
-                        end: DateTime(r.end.year, r.end.month - 6, 1),
-                      );
+                      ref.read(rentalOccupancyAnchorProvider.notifier).state =
+                          rentalOccupancyStepAnchor(viewMode, anchor, -1);
                     },
                     icon: const Icon(Icons.chevron_left_rounded),
                   ),
                   Expanded(
                     child: Text(
-                      rangeLabel,
+                      periodLabel,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                     ),
@@ -61,18 +93,16 @@ class RentalCalendarPage extends ConsumerWidget {
                     label: 'Hoje',
                     expand: false,
                     onPressed: () {
-                      ref.read(rentalGanttRangeProvider.notifier).state = rentalGanttDefaultRange();
+                      ref.read(rentalOccupancyAnchorProvider.notifier).state =
+                          rentalGanttDateOnly(DateTime.now());
                     },
                   ),
                   const SizedBox(width: 4),
                   IconButton(
-                    tooltip: 'Próximo período',
+                    tooltip: rentalOccupancyNavTooltip(viewMode, 1),
                     onPressed: () {
-                      final r = ref.read(rentalGanttRangeProvider);
-                      ref.read(rentalGanttRangeProvider.notifier).state = RentalGanttRange(
-                        start: DateTime(r.start.year, r.start.month + 6, 1),
-                        end: DateTime(r.end.year, r.end.month + 6, 1),
-                      );
+                      ref.read(rentalOccupancyAnchorProvider.notifier).state =
+                          rentalOccupancyStepAnchor(viewMode, anchor, 1);
                     },
                     icon: const Icon(Icons.chevron_right_rounded),
                   ),
@@ -114,11 +144,12 @@ class RentalCalendarPage extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: RentalGanttChart(
-                                key: ValueKey('${range.start}-${range.end}'),
+                                key: ValueKey('${viewMode.name}-${range.start}'),
                                 properties: properties,
                                 bookings: bookings,
                                 leases: leases,
                                 range: range,
+                                viewMode: viewMode,
                               ),
                             ),
                             const _GanttLegend(),

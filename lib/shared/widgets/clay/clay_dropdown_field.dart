@@ -51,6 +51,17 @@ class ClayDropdownField<T> extends StatelessWidget {
           child: DropdownButtonFormField<T>(
             value: value,
             isExpanded: true,
+            borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+            dropdownColor: ClayTokens.surfaceRaised,
+            elevation: 12,
+            menuMaxHeight: 320,
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: ClayTokens.muted,
+            ),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: ClayTokens.foreground,
+                ),
             decoration: InputDecoration(
               hintText: hint,
               border: InputBorder.none,
@@ -63,10 +74,13 @@ class ClayDropdownField<T> extends StatelessWidget {
                 .map(
                   (item) => DropdownMenuItem<T>(
                     value: item,
-                    child: Text(
-                      itemLabel(item),
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Text(
+                        itemLabel(item),
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   ),
                 )

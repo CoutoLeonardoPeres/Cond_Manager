@@ -6,9 +6,13 @@ import 'package:cond_manager/features/rental/domain/entities/rental_booking.dart
 import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_party.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_inclusion_catalog_item.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_inclusion.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_photo.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
 import 'package:cond_manager/features/rental/domain/repositories/rental_repository.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_gantt_timeline.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_occupancy_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final rentalRepositoryProvider = Provider<RentalRepository>((ref) {
@@ -27,13 +31,23 @@ final rentalChargeListFilterProvider = StateProvider<RentalChargeListFilter>(
   (ref) => const RentalChargeListFilter(),
 );
 
-final rentalGanttRangeProvider = StateProvider<RentalGanttRange>(
-  (ref) => rentalGanttDefaultRange(),
+final rentalOccupancyViewModeProvider = StateProvider<RentalOccupancyViewMode>(
+  (ref) => RentalOccupancyViewMode.month,
 );
+
+final rentalOccupancyAnchorProvider = StateProvider<DateTime>(
+  (ref) => rentalGanttDateOnly(DateTime.now()),
+);
+
+final rentalOccupancyRangeProvider = Provider<RentalGanttRange>((ref) {
+  final mode = ref.watch(rentalOccupancyViewModeProvider);
+  final anchor = ref.watch(rentalOccupancyAnchorProvider);
+  return rentalOccupancyRangeFor(mode, anchor);
+});
 
 final rentalGanttBookingsProvider =
     FutureProvider.autoDispose<List<RentalBooking>>((ref) async {
-  final range = ref.watch(rentalGanttRangeProvider);
+  final range = ref.watch(rentalOccupancyRangeProvider);
   final result = await ref.watch(rentalRepositoryProvider).listBookings(
         from: range.start,
         to: range.end.subtract(const Duration(days: 1)),
@@ -59,6 +73,24 @@ final rentalPropertyDetailProvider =
     FutureProvider.autoDispose.family<RentalProperty, String>((ref, id) async {
   final result = await ref.watch(rentalRepositoryProvider).getProperty(id);
   return result.when(success: (p) => p, failure: (e) => throw e);
+});
+
+final rentalPropertyInclusionsProvider =
+    FutureProvider.autoDispose.family<List<RentalPropertyInclusion>, String>((ref, id) async {
+  final result = await ref.watch(rentalRepositoryProvider).listPropertyInclusions(id);
+  return result.when(success: (l) => l, failure: (e) => throw e);
+});
+
+final rentalInclusionCatalogProvider =
+    FutureProvider.autoDispose.family<List<RentalInclusionCatalogItem>, String>((ref, companyId) async {
+  final result = await ref.watch(rentalRepositoryProvider).listInclusionCatalog(companyId);
+  return result.when(success: (l) => l, failure: (e) => throw e);
+});
+
+final rentalPropertyPhotosProvider =
+    FutureProvider.autoDispose.family<List<RentalPropertyPhoto>, String>((ref, id) async {
+  final result = await ref.watch(rentalRepositoryProvider).listPropertyPhotos(id);
+  return result.when(success: (l) => l, failure: (e) => throw e);
 });
 
 final rentalLeasesListProvider =

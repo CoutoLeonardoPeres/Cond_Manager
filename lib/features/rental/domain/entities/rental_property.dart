@@ -20,6 +20,9 @@ class RentalProperty extends Equatable {
     this.addressNeighborhood,
     this.addressStreet,
     this.addressNumber,
+    this.addressBuilding,
+    this.addressBlock,
+    this.addressApartment,
     this.addressZip,
     this.areaSqm,
     this.bedrooms,
@@ -47,6 +50,9 @@ class RentalProperty extends Equatable {
   final String? addressNeighborhood;
   final String? addressStreet;
   final String? addressNumber;
+  final String? addressBuilding;
+  final String? addressBlock;
+  final String? addressApartment;
   final String? addressZip;
   final double? areaSqm;
   final int? bedrooms;

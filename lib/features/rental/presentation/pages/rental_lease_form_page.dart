@@ -241,13 +241,17 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
                     ),
                     FormGridField(
                       child: partiesAsync.when(
-                        data: (list) => ClayDropdownField<RentalParty?>(
-                          label: 'Inquilino',
+                        data: (list) {
+                          final tenants =
+                              list.where((p) => p.category.canBeLeaseTenant).toList();
+                          return ClayDropdownField<RentalParty?>(
+                          label: 'Inquilino / Locatário',
                           value: _tenant,
-                          items: [null, ...list],
+                          items: [null, ...tenants],
                           itemLabel: (p) => p?.fullName ?? '—',
                           onChanged: (v) => setState(() => _tenant = v),
-                        ),
+                        );
+                        },
                         loading: () => const LinearProgressIndicator(),
                         error: (_, _) => const SizedBox.shrink(),
                       ),

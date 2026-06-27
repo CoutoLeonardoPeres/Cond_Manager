@@ -133,6 +133,30 @@ class AppTheme {
           borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
         ),
       ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: const WidgetStatePropertyAll(ClayTokens.surfaceRaised),
+          elevation: const WidgetStatePropertyAll(12),
+          padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 8)),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+            ),
+          ),
+        ),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        menuStyle: MenuStyle(
+          backgroundColor: const WidgetStatePropertyAll(ClayTokens.surfaceRaised),
+          elevation: const WidgetStatePropertyAll(12),
+          padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 8)),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

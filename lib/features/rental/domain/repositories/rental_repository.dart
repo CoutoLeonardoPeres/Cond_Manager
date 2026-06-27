@@ -4,6 +4,9 @@ import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart'
 import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_party.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_inclusion_catalog_item.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_inclusion.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_property_photo.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property_pnl.dart';
 
 abstract class RentalRepository {
@@ -14,6 +17,31 @@ abstract class RentalRepository {
   Future<Result<RentalProperty>> createProperty(RentalPropertyInput input);
 
   Future<Result<RentalProperty>> updateProperty(String id, RentalPropertyInput input);
+
+  Future<Result<List<RentalPropertyInclusion>>> listPropertyInclusions(String propertyId);
+
+  Future<Result<void>> replacePropertyInclusions(
+    String propertyId,
+    String companyId,
+    List<RentalPropertyInclusionInput> items,
+  );
+
+  Future<Result<List<RentalInclusionCatalogItem>>> listInclusionCatalog(String companyId);
+
+  Future<Result<RentalInclusionCatalogItem>> createInclusionCatalogItem(
+    RentalInclusionCatalogInput input,
+  );
+
+  Future<Result<List<RentalPropertyPhoto>>> listPropertyPhotos(String propertyId);
+
+  Future<Result<void>> uploadPropertyPhotos({
+    required String propertyId,
+    required String companyId,
+    required List<PendingRentalPropertyPhoto> files,
+    int sortOffset = 0,
+  });
+
+  Future<Result<void>> deletePropertyPhotos(List<String> photoIds);
 
   Future<Result<List<RentalParty>>> listParties();
 

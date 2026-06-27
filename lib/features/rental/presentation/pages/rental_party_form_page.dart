@@ -3,6 +3,7 @@ import 'package:cond_manager/features/auth/presentation/providers/auth_providers
 import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_party.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/shared/domain/enums/rental_party_category.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,9 +29,23 @@ class _RentalPartyFormPageState extends ConsumerState<RentalPartyFormPage> {
   final _notesController = TextEditingController();
 
   String _status = 'active';
+  RentalPartyCategory _category = RentalPartyCategory.tenant;
   bool _loading = false;
   String? _error;
   bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialCategoryFromRoute());
+  }
+
+  void _applyInitialCategoryFromRoute() {
+    if (widget.isEditing || !mounted) return;
+    final categoryParam = GoRouterState.of(context).uri.queryParameters['category'];
+    if (categoryParam == null) return;
+    setState(() => _category = RentalPartyCategory.fromValue(categoryParam));
+  }
 
   @override
   void dispose() {
@@ -46,15 +61,17 @@ class _RentalPartyFormPageState extends ConsumerState<RentalPartyFormPage> {
     _fullNameController.text = p.fullName;
     _emailController.text = p.email ?? '';
     ClayMaskedField.setPhone(_phoneController, p.phone);
-    _documentController.text = p.documentNumber ?? '';
+    ClayMaskedField.setCpf(_documentController, p.documentNumber);
     _notesController.text = p.notes ?? '';
     _status = p.status;
+    _category = p.category;
     _loaded = true;
   }
 
   RentalPartyInput _buildInput(String companyId) => RentalPartyInput(
         companyId: companyId,
         fullName: _fullNameController.text.trim(),
+        category: _category,
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         documentNumber:
@@ -200,9 +217,20 @@ class _RentalPartyFormPageState extends ConsumerState<RentalPartyFormPage> {
                       ),
                     ),
                     FormGridField(
-                      child: ClayTextField(
+                      child: ClayMaskedField.cpf(
                         controller: _documentController,
-                        label: 'CPF/CNPJ',
+                        label: 'CPF',
+                      ),
+                    ),
+                    FormGridField(
+                      child: ClayDropdownField<RentalPartyCategory>(
+                        label: 'Categoria *',
+                        value: _category,
+                        items: RentalPartyCategory.values,
+                        itemLabel: (c) => c.label,
+                        onChanged: (v) {
+                          if (v != null) setState(() => _category = v);
+                        },
                       ),
                     ),
                     FormGridField(
