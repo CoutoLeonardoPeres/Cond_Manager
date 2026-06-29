@@ -12,6 +12,8 @@ abstract class WorkOrderRepository {
 
   Future<Result<WorkOrder>> create(WorkOrderCreateInput input);
 
+  Future<Result<WorkOrder>> updateHeader(String id, WorkOrderHeaderUpdateInput input);
+
   Future<Result<WorkOrder>> updateStatus(
     String id,
     WorkOrderStatus status, {

@@ -4,6 +4,9 @@ import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart'
 import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_party.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
+import 'package:cond_manager/features/rental/domain/services/rental_lease_contract_pdf_service.dart';
+import 'package:cond_manager/features/rental/domain/utils/rental_lease_contract_pdf_mapper.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_lease_contract_terms_form.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
 import 'package:cond_manager/shared/domain/enums/rental_lease_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
@@ -38,8 +41,13 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
   DateTime _startDate = DateTime.now();
   DateTime? _endDate;
   bool _loading = false;
+  bool _generatingPdf = false;
   String? _error;
   bool _loaded = false;
+  int _termsFormKey = 0;
+  RentalLeaseContractTerms _contractTerms = RentalLeaseContractTerms.empty;
+
+  static const _pdfService = RentalLeaseContractPdfService();
 
   @override
   void dispose() {
@@ -78,6 +86,8 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
     if (lease.dueDayOfMonth != null) _dueDayController.text = lease.dueDayOfMonth.toString();
     _leaseNumberController.text = lease.leaseNumber ?? '';
     _notesController.text = lease.notes ?? '';
+    _contractTerms = lease.contractTerms;
+    _termsFormKey++;
     _loaded = true;
   }
 
@@ -96,7 +106,73 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
         depositAmount: _parse(_depositController.text) > 0 ? _parse(_depositController.text) : null,
         dueDayOfMonth: _parseInt(_dueDayController.text),
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        contractTerms: _contractTerms,
       );
+
+  RentalParty? _findLandlord(List<RentalParty> parties) {
+    final ownerId = _property?.ownerPartyId;
+    if (ownerId == null) return null;
+    for (final party in parties) {
+      if (party.id == ownerId) return party;
+    }
+    return null;
+  }
+
+  RentalLeaseContractPdfContext _buildPdfContext(List<RentalParty> parties) =>
+      RentalLeaseContractPdfContext(
+        property: _property!,
+        landlord: _findLandlord(parties),
+        tenant: _tenant,
+        startDate: _startDate,
+        endDate: _endDate,
+        monthlyRent: _parse(_monthlyRentController.text),
+        depositAmount:
+            _parse(_depositController.text) > 0 ? _parse(_depositController.text) : null,
+        dueDayOfMonth: _parseInt(_dueDayController.text),
+        leaseNumber: _leaseNumberController.text.trim().isEmpty
+            ? null
+            : _leaseNumberController.text.trim(),
+        leaseId: widget.leaseId,
+        status: _status,
+        listingMode: _listingMode,
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        contractTerms: _contractTerms,
+      );
+
+  bool get _canShowPdfButton => widget.isEditing || _property != null;
+
+  Future<void> _generatePdf(List<RentalParty> parties) async {
+    if (_property == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecione o imóvel para gerar o contrato.')),
+      );
+      return;
+    }
+
+    final contextData = _buildPdfContext(parties);
+    final validation = validateRentalLeaseContractPdfContext(contextData);
+    if (validation != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(validation)));
+      return;
+    }
+
+    setState(() => _generatingPdf = true);
+    try {
+      await _pdfService.previewContract(context: contextData);
+    } on RentalLeaseContractPdfException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível gerar o PDF: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _generatingPdf = false);
+    }
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -160,7 +236,7 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
 
     if (widget.isEditing) {
       ref.watch(rentalLeaseDetailProvider(widget.leaseId!)).whenData((lease) {
-        if (!_loaded && properties.isNotEmpty) {
+        if (!_loaded && properties.isNotEmpty && parties.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && !_loaded) setState(() => _fill(lease, properties, parties));
           });
@@ -206,7 +282,7 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Contrato de locação de longo prazo vinculado a um imóvel e inquilino.',
+                  'Defina vínculos, valores e termos contratuais para geração do PDF.',
                   style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
                 ),
                 if (_error != null) ...[
@@ -242,15 +318,23 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
                     FormGridField(
                       child: partiesAsync.when(
                         data: (list) {
-                          final tenants =
-                              list.where((p) => p.category.canBeLeaseTenant).toList();
-                          return ClayDropdownField<RentalParty?>(
-                          label: 'Inquilino / Locatário',
-                          value: _tenant,
-                          items: [null, ...tenants],
-                          itemLabel: (p) => p?.fullName ?? '—',
-                          onChanged: (v) => setState(() => _tenant = v),
-                        );
+                          final tenants = list
+                              .where((p) => p.category.canBeLeaseTenant)
+                              .toList()
+                            ..sort(
+                              (a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
+                            );
+                          if (_tenant != null && tenants.every((p) => p.id != _tenant!.id)) {
+                            tenants.insert(0, _tenant!);
+                          }
+                          return ClaySearchableDropdownField<RentalParty>(
+                            label: 'Inquilino / Locatário',
+                            hint: 'Digite o nome para buscar…',
+                            value: _tenant,
+                            items: tenants,
+                            itemLabel: (p) => p.fullName,
+                            onChanged: (v) => setState(() => _tenant = v),
+                          );
                         },
                         loading: () => const LinearProgressIndicator(),
                         error: (_, _) => const SizedBox.shrink(),
@@ -338,6 +422,14 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                RentalLeaseContractTermsForm(
+                  key: ValueKey(_termsFormKey),
+                  columns: columns,
+                  listingMode: _listingMode,
+                  initial: _contractTerms,
+                  onChanged: (t) => _contractTerms = t,
+                ),
+                const SizedBox(height: 16),
                 FormGridSection(
                   title: 'Observações',
                   columns: columns,
@@ -353,18 +445,55 @@ class _RentalLeaseFormPageState extends ConsumerState<RentalLeaseFormPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    width: columns >= 3 ? 220 : double.infinity,
-                    child: ClayButton(
-                      label: widget.isEditing ? 'Salvar' : 'Cadastrar',
-                      icon: Icons.save_rounded,
-                      isLoading: _loading,
-                      onPressed: _loading ? null : _submit,
+                if (columns >= 3)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (_canShowPdfButton) ...[
+                        SizedBox(
+                          width: 260,
+                          child: ClayButton(
+                            label: 'Gerar contrato em PDF',
+                            icon: Icons.picture_as_pdf_rounded,
+                            variant: ClayButtonVariant.secondary,
+                            isLoading: _generatingPdf,
+                            onPressed: (_loading || _generatingPdf)
+                                ? null
+                                : () => _generatePdf(parties),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      SizedBox(
+                        width: 220,
+                        child: ClayButton(
+                          label: widget.isEditing ? 'Salvar' : 'Cadastrar',
+                          icon: Icons.save_rounded,
+                          isLoading: _loading,
+                          onPressed: _loading ? null : _submit,
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  if (_canShowPdfButton) ...[
+                    ClayButton(
+                      label: 'Gerar contrato em PDF',
+                      icon: Icons.picture_as_pdf_rounded,
+                      variant: ClayButtonVariant.secondary,
+                      isLoading: _generatingPdf,
+                      onPressed:
+                          (_loading || _generatingPdf) ? null : () => _generatePdf(parties),
                     ),
+                    const SizedBox(height: 12),
+                  ],
+                  ClayButton(
+                    label: widget.isEditing ? 'Salvar' : 'Cadastrar',
+                    icon: Icons.save_rounded,
+                    isLoading: _loading,
+                    onPressed: _loading ? null : _submit,
                   ),
-                ),
+                ],
               ],
             ),
           ),

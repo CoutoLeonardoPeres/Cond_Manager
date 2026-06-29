@@ -1,7 +1,12 @@
+import 'package:cond_manager/core/permissions/app_permissions.dart';
+import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_booking_edit_sheet.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_lease_edit_sheet.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_gantt_chart.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_gantt_timeline.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_occupancy_view.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_quick_booking_sheet.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +23,7 @@ class RentalCalendarPage extends ConsumerWidget {
     final bookingsAsync = ref.watch(rentalGanttBookingsProvider);
     final leasesAsync = ref.watch(rentalGanttLeasesProvider);
     final periodLabel = rentalOccupancyPeriodLabel(viewMode, anchor);
+    final canManage = ref.watch(currentProfileProvider).value?.permissions.canManageRental ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,6 +156,31 @@ class RentalCalendarPage extends ConsumerWidget {
                                 leases: leases,
                                 range: range,
                                 viewMode: viewMode,
+                                onCellTap: canManage
+                                    ? (property, date) => showRentalQuickBookingSheet(
+                                          context,
+                                          ref,
+                                          property: property,
+                                          checkIn: date,
+                                        )
+                                    : null,
+                                onSegmentTap: canManage
+                                    ? (segment) {
+                                        if (segment.kind == RentalGanttSegmentKind.booking) {
+                                          showRentalBookingEditSheet(
+                                            context,
+                                            ref,
+                                            bookingId: segment.id,
+                                          );
+                                        } else if (segment.kind == RentalGanttSegmentKind.lease) {
+                                          showRentalLeaseEditSheet(
+                                            context,
+                                            ref,
+                                            leaseId: segment.id,
+                                          );
+                                        }
+                                      }
+                                    : null,
                               ),
                             ),
                             const _GanttLegend(),
@@ -196,7 +227,9 @@ class _GanttLegend extends StatelessWidget {
             label: 'Contrato ativo (longo prazo)',
           ),
           _LegendDot(color: ClayTokens.primary, label: 'Hoje'),
-          _LegendFree(label: 'Livre — célula sem barra'),
+          _LegendFree(label: 'Livre — toque na célula para reservar'),
+          _LegendWeekend(),
+          _LegendTap(label: 'Toque na barra para editar reserva ou contrato'),
         ],
       ),
     );
@@ -264,6 +297,58 @@ class _LegendFree extends StatelessWidget {
           decoration: BoxDecoration(
             color: ClayTokens.surfaceRaised,
             border: Border.all(color: ClayTokens.textMuted.withValues(alpha: 0.35)),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontSize: 12, color: ClayTokens.textSecondary)),
+      ],
+    );
+  }
+}
+
+class _LegendWeekend extends StatelessWidget {
+  const _LegendWeekend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 28,
+          height: 10,
+          decoration: BoxDecoration(
+            color: ClayTokens.accentAlt.withValues(alpha: 0.07),
+            border: Border.all(color: ClayTokens.accentAlt.withValues(alpha: 0.25)),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          'Fim de semana — disponível para locação',
+          style: TextStyle(fontSize: 12, color: ClayTokens.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendTap extends StatelessWidget {
+  const _LegendTap({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 28,
+          height: 10,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [ClayTokens.tertiary, ClayTokens.accent]),
             borderRadius: BorderRadius.circular(4),
           ),
         ),

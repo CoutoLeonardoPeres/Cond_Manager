@@ -12,9 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class RentalBookingFormPage extends ConsumerStatefulWidget {
-  const RentalBookingFormPage({super.key, this.bookingId});
+  const RentalBookingFormPage({super.key, this.bookingId, this.initialPropertyId});
 
   final String? bookingId;
+  final String? initialPropertyId;
 
   bool get isEditing => bookingId != null;
 
@@ -40,6 +41,7 @@ class _RentalBookingFormPageState extends ConsumerState<RentalBookingFormPage> {
   bool _loading = false;
   String? _error;
   bool _loaded = false;
+  bool _initialPropertyApplied = false;
 
   @override
   void dispose() {
@@ -68,6 +70,28 @@ class _RentalBookingFormPageState extends ConsumerState<RentalBookingFormPage> {
     final rate = _parse(_nightlyRateController.text);
     if (rate > 0) {
       _totalAmountController.text = (nights * rate).toStringAsFixed(2);
+    }
+  }
+
+  void _applyInitialProperty(List<RentalProperty> properties) {
+    final id = widget.initialPropertyId;
+    if (id == null || _initialPropertyApplied) return;
+
+    RentalProperty? match;
+    for (final p in properties) {
+      if (p.id == id) {
+        match = p;
+        break;
+      }
+    }
+    if (match == null) return;
+
+    _property = match;
+    _initialPropertyApplied = true;
+    final rate = match.baseDailyRate;
+    if (rate != null && rate > 0) {
+      _nightlyRateController.text = rate.toString();
+      _recalcTotal();
     }
   }
 
@@ -182,6 +206,12 @@ class _RentalBookingFormPageState extends ConsumerState<RentalBookingFormPage> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && !_loaded) setState(() => _fill(b, properties));
           });
+        }
+      });
+    } else if (widget.initialPropertyId != null && !_initialPropertyApplied && properties.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_initialPropertyApplied) {
+          setState(() => _applyInitialProperty(properties));
         }
       });
     }

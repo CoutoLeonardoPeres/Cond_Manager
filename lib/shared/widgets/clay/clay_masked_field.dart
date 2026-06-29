@@ -14,6 +14,7 @@ class ClayMaskedField {
     bool required = false,
     String? Function(String?)? validator,
     bool readOnly = false,
+    Future<void> Function()? onComplete,
   }) {
     return ClayTextField(
       controller: controller,
@@ -24,6 +25,12 @@ class ClayMaskedField {
       inputFormatters: [PhoneMaskFormatter()],
       validator: validator ??
           (required ? (v) => BrazilianValidators.phone(v, required: true) : null),
+      onChanged: (value) {
+        final digits = BrazilianInputFormat.digitsOnly(value);
+        if (digits.length >= 10 && digits.length <= 11) {
+          onComplete?.call();
+        }
+      },
     );
   }
 
@@ -32,6 +39,7 @@ class ClayMaskedField {
     String? label,
     bool required = false,
     String? Function(String?)? validator,
+    Future<void> Function()? onComplete,
   }) {
     return ClayTextField(
       controller: controller,
@@ -41,6 +49,12 @@ class ClayMaskedField {
       inputFormatters: [CpfMaskFormatter()],
       validator: validator ??
           (required ? (v) => BrazilianValidators.cpf(v, required: true) : null),
+      onChanged: (value) {
+        final digits = BrazilianInputFormat.digitsOnly(value);
+        if (digits.length == 11) {
+          onComplete?.call();
+        }
+      },
     );
   }
 

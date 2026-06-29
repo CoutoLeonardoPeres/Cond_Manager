@@ -25,3 +25,18 @@ String buildInviteLink(String token) {
 
   return '/invite/$token';
 }
+
+/// Monta o link público do formulário de cadastro de locatário/inquilino.
+String buildTenantIntakeLink(String token) {
+  final publicUrl = resolveAppPublicUrl();
+  if (publicUrl != null) {
+    return '${publicUrl.replaceAll(RegExp(r'/+$'), '')}/cadastro-locatario/$token';
+  }
+
+  final base = Uri.base;
+  if (base.hasScheme && base.host.isNotEmpty) {
+    return '${base.origin}/cadastro-locatario/$token';
+  }
+
+  return '/cadastro-locatario/$token';
+}

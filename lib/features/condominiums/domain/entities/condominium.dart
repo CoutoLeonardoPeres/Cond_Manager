@@ -152,3 +152,57 @@ class CondominiumCreateInput {
   final String? managerState;
   final String? managerZipCode;
 }
+
+class CondominiumListFilter extends Equatable {
+  const CondominiumListFilter({
+    this.search = '',
+    this.state,
+    this.city,
+  });
+
+  final String search;
+  final String? state;
+  final String? city;
+
+  CondominiumListFilter copyWith({
+    String? search,
+    String? state,
+    String? city,
+    bool clearState = false,
+    bool clearCity = false,
+  }) {
+    return CondominiumListFilter(
+      search: search ?? this.search,
+      state: clearState ? null : (state ?? this.state),
+      city: clearCity ? null : (city ?? this.city),
+    );
+  }
+
+  bool get hasActiveFilters =>
+      search.trim().isNotEmpty || state != null || city != null;
+
+  @override
+  List<Object?> get props => [search, state, city];
+}
+
+bool condominiumMatchesListFilter(Condominium condominium, CondominiumListFilter filter) {
+  final query = filter.search.trim().toLowerCase();
+  if (query.isNotEmpty) {
+    final nameMatch = condominium.name.toLowerCase().contains(query);
+    final legalMatch = condominium.legalName?.toLowerCase().contains(query) ?? false;
+    if (!nameMatch && !legalMatch) return false;
+  }
+  if (filter.state != null &&
+      condominium.state.trim().toLowerCase() != filter.state!.trim().toLowerCase()) {
+    return false;
+  }
+  if (filter.city != null &&
+      condominium.city.trim().toLowerCase() != filter.city!.trim().toLowerCase()) {
+    return false;
+  }
+  return true;
+}
+
+List<Condominium> filterCondominiums(List<Condominium> condominiums, CondominiumListFilter filter) {
+  return condominiums.where((c) => condominiumMatchesListFilter(c, filter)).toList();
+}

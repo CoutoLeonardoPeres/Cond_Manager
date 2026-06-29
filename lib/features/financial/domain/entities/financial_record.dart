@@ -1,6 +1,9 @@
+import 'package:cond_manager/shared/domain/enums/condominium_bill_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_category.dart';
 import 'package:cond_manager/shared/domain/enums/financial_record_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_scope.dart';
+import 'package:cond_manager/shared/domain/enums/rental_expense_entry_type.dart';
+import 'package:cond_manager/shared/domain/enums/service_type.dart';
 import 'package:equatable/equatable.dart';
 
 class FinancialRecord extends Equatable {
@@ -26,6 +29,22 @@ class FinancialRecord extends Equatable {
     this.providerId,
     this.providerName,
     this.notes,
+    this.unitId,
+    this.unitLabel,
+    this.blockId,
+    this.blockName,
+    this.rentalPropertyId,
+    this.rentalPropertyTitle,
+    this.rentalExpenseEntryType,
+    this.condominiumBillType,
+    this.expenseServiceType,
+    this.materialCategoryId,
+    this.materialCategoryName,
+    this.isRecurringTemplate = false,
+    this.recurrenceTemplateId,
+    this.recurrenceDayOfMonth,
+    this.recurrenceActive = true,
+    this.allocationParentId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -51,12 +70,32 @@ class FinancialRecord extends Equatable {
   final String? providerId;
   final String? providerName;
   final String? notes;
+  final String? unitId;
+  final String? unitLabel;
+  final String? blockId;
+  final String? blockName;
+  final String? rentalPropertyId;
+  final String? rentalPropertyTitle;
+  final RentalExpenseEntryType? rentalExpenseEntryType;
+  final CondominiumBillType? condominiumBillType;
+  final ServiceType? expenseServiceType;
+  final String? materialCategoryId;
+  final String? materialCategoryName;
+  final bool isRecurringTemplate;
+  final String? recurrenceTemplateId;
+  final int? recurrenceDayOfMonth;
+  final bool recurrenceActive;
+  final String? allocationParentId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
   double get totalWithTax => amount + taxAmount;
 
   bool get isPaid => paidAt != null;
+
+  bool get isRentalModuleExpense => rentalExpenseEntryType != null;
+
+  bool get isAllocationChild => allocationParentId != null;
 
   String? get workOrderDisplay =>
       workOrderNumber != null ? 'OS-${workOrderNumber!.toString().padLeft(5, '0')}' : null;
@@ -184,6 +223,17 @@ class FinancialRecordCreateInput extends Equatable {
     this.workOrderId,
     this.providerId,
     this.notes,
+    this.unitId,
+    this.blockId,
+    this.rentalPropertyId,
+    this.rentalExpenseEntryType,
+    this.condominiumBillType,
+    this.expenseServiceType,
+    this.materialCategoryId,
+    this.isRecurringTemplate = false,
+    this.recurrenceDayOfMonth,
+    this.recurrenceActive = true,
+    this.allocationParentId,
   });
 
   final FinancialScope scope;
@@ -202,6 +252,17 @@ class FinancialRecordCreateInput extends Equatable {
   final String? workOrderId;
   final String? providerId;
   final String? notes;
+  final String? unitId;
+  final String? blockId;
+  final String? rentalPropertyId;
+  final RentalExpenseEntryType? rentalExpenseEntryType;
+  final CondominiumBillType? condominiumBillType;
+  final ServiceType? expenseServiceType;
+  final String? materialCategoryId;
+  final bool isRecurringTemplate;
+  final int? recurrenceDayOfMonth;
+  final bool recurrenceActive;
+  final String? allocationParentId;
 
   @override
   List<Object?> get props => [scope, description, amount];
@@ -223,6 +284,17 @@ class FinancialRecordUpdateInput extends Equatable {
     this.workOrderId,
     this.providerId,
     this.notes,
+    this.unitId,
+    this.blockId,
+    this.rentalPropertyId,
+    this.rentalExpenseEntryType,
+    this.condominiumBillType,
+    this.expenseServiceType,
+    this.materialCategoryId,
+    this.isRecurringTemplate = false,
+    this.recurrenceDayOfMonth,
+    this.recurrenceActive = true,
+    this.allocationParentId,
   });
 
   final FinancialRecordType recordType;
@@ -239,6 +311,17 @@ class FinancialRecordUpdateInput extends Equatable {
   final String? workOrderId;
   final String? providerId;
   final String? notes;
+  final String? unitId;
+  final String? blockId;
+  final String? rentalPropertyId;
+  final RentalExpenseEntryType? rentalExpenseEntryType;
+  final CondominiumBillType? condominiumBillType;
+  final ServiceType? expenseServiceType;
+  final String? materialCategoryId;
+  final bool isRecurringTemplate;
+  final int? recurrenceDayOfMonth;
+  final bool recurrenceActive;
+  final String? allocationParentId;
 
   @override
   List<Object?> get props => [description];

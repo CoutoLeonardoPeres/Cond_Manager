@@ -161,6 +161,8 @@ class CondominiumDetailPage extends ConsumerWidget {
                   ],
                 ),
               ],
+              const SizedBox(height: 16),
+              _BlocksSection(condominiumId: condominiumId),
             ],
           ),
         ),
@@ -227,6 +229,51 @@ String _formatPhone(String? v) {
     return '(${d.substring(0, 2)}) ${d.substring(2, 6)}-${d.substring(6)}';
   }
   return v!.trim();
+}
+
+class _BlocksSection extends ConsumerWidget {
+  const _BlocksSection({required this.condominiumId});
+
+  final String condominiumId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final blocksAsync = ref.watch(condominiumBlocksProvider(condominiumId));
+
+    return blocksAsync.when(
+      loading: () => const _DetailSection(
+        title: 'Blocos / Torres',
+        children: [
+          Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator(strokeWidth: 2))),
+        ],
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (blocks) {
+        if (blocks.isEmpty) {
+          return const _DetailSection(
+            title: 'Blocos / Torres',
+            children: [
+              Text(
+                'Nenhum bloco ou torre cadastrado.',
+                style: TextStyle(color: ClayTokens.textMuted),
+              ),
+            ],
+          );
+        }
+        return _DetailSection(
+          title: 'Blocos / Torres',
+          children: blocks
+              .map(
+                (b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(b.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
 }
 
 class _DetailSection extends StatelessWidget {

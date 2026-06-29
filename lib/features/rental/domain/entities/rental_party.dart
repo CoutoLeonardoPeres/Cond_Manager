@@ -12,6 +12,22 @@ class RentalParty extends Equatable {
     this.documentNumber,
     this.notes,
     required this.status,
+    this.isRentalRestricted = false,
+    this.restrictionReason,
+    this.restrictedAt,
+    this.addressStreet,
+    this.addressNumber,
+    this.addressComplement,
+    this.addressNeighborhood,
+    this.addressCity,
+    this.addressState,
+    this.addressZip,
+    this.intakeMetadata,
+    this.nationality,
+    this.rgNumber,
+    this.rgIssuer,
+    this.profession,
+    this.maritalStatus,
   });
 
   final String id;
@@ -23,6 +39,22 @@ class RentalParty extends Equatable {
   final String? documentNumber;
   final String? notes;
   final String status;
+  final bool isRentalRestricted;
+  final String? restrictionReason;
+  final DateTime? restrictedAt;
+  final String? addressStreet;
+  final String? addressNumber;
+  final String? addressComplement;
+  final String? addressNeighborhood;
+  final String? addressCity;
+  final String? addressState;
+  final String? addressZip;
+  final Map<String, dynamic>? intakeMetadata;
+  final String? nationality;
+  final String? rgNumber;
+  final String? rgIssuer;
+  final String? profession;
+  final String? maritalStatus;
 
   @override
   List<Object?> get props => [id];

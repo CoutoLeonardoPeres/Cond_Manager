@@ -1,7 +1,9 @@
+import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
 import 'package:cond_manager/shared/domain/enums/rental_booking_channel.dart';
 import 'package:cond_manager/shared/domain/enums/rental_booking_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_charge_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_charge_type.dart';
+import 'package:cond_manager/shared/domain/enums/rental_lease_contract_enums.dart';
 import 'package:cond_manager/shared/domain/enums/rental_lease_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
 import 'package:cond_manager/shared/domain/enums/rental_party_category.dart';
@@ -24,6 +26,7 @@ class RentalCharge extends Equatable {
     this.dueDate,
     this.paidAt,
     this.financialRecordId,
+    this.paidPaymentMethod,
     this.notes,
   });
 
@@ -41,34 +44,145 @@ class RentalCharge extends Equatable {
   final DateTime? dueDate;
   final DateTime? paidAt;
   final String? financialRecordId;
+  final RentalPaymentMethod? paidPaymentMethod;
   final String? notes;
 
   bool get isPaid => status == RentalChargeStatus.paid;
+
+  bool get isOverdue {
+    if (isPaid ||
+        status == RentalChargeStatus.cancelled ||
+        status == RentalChargeStatus.refunded) {
+      return false;
+    }
+    if (dueDate == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate!.year, dueDate!.month, dueDate!.day);
+    return due.isBefore(today);
+  }
+
+  String get displayStatusLabel {
+    if (isPaid) return RentalChargeStatus.paid.label;
+    if (isOverdue) return RentalChargeStatus.overdue.label;
+    return status.label;
+  }
+
+  bool get canConfirmPayment =>
+      !isPaid &&
+      status != RentalChargeStatus.cancelled &&
+      status != RentalChargeStatus.refunded;
+
+  /// Coluna do quadro de cobranças (null = cancelada/reembolsada).
+  RentalChargeBoardColumn? get boardColumn {
+    if (isPaid) return RentalChargeBoardColumn.paid;
+    if (isOverdue) return RentalChargeBoardColumn.overdue;
+    if (canConfirmPayment) return RentalChargeBoardColumn.newCharges;
+    return null;
+  }
 
   @override
   List<Object?> get props => [id];
 }
 
+/// Colunas do quadro na tela de cobranças.
+enum RentalChargeBoardColumn {
+  newCharges('Novas'),
+  overdue('Atrasadas'),
+  paid('Pagas');
+
+  const RentalChargeBoardColumn(this.label);
+  final String label;
+}
+
+/// Dados confirmados no modal de pagamento da cobrança.
+class RentalChargePaymentConfirmation {
+  const RentalChargePaymentConfirmation({
+    required this.paymentMethod,
+    required this.paidAmount,
+    required this.paidAt,
+  });
+
+  final RentalPaymentMethod paymentMethod;
+  final double paidAmount;
+  final DateTime paidAt;
+}
+
 class RentalChargeListFilter extends Equatable {
-  const RentalChargeListFilter({this.status, this.chargeType});
+  const RentalChargeListFilter({
+    this.status,
+    this.chargeType,
+    this.bookingId,
+    this.quickFilter = RentalChargeQuickFilter.all,
+    this.month,
+  });
 
   final RentalChargeStatus? status;
   final RentalChargeType? chargeType;
+  final String? bookingId;
+  final RentalChargeQuickFilter quickFilter;
+  final DateTime? month;
 
   RentalChargeListFilter copyWith({
     RentalChargeStatus? status,
     RentalChargeType? chargeType,
+    String? bookingId,
+    RentalChargeQuickFilter? quickFilter,
+    DateTime? month,
     bool clearStatus = false,
     bool clearType = false,
+    bool clearBookingId = false,
+    bool clearMonth = false,
   }) {
     return RentalChargeListFilter(
       status: clearStatus ? null : (status ?? this.status),
       chargeType: clearType ? null : (chargeType ?? this.chargeType),
+      bookingId: clearBookingId ? null : (bookingId ?? this.bookingId),
+      quickFilter: quickFilter ?? this.quickFilter,
+      month: clearMonth ? null : (month ?? this.month),
     );
   }
 
   @override
-  List<Object?> get props => [status, chargeType];
+  List<Object?> get props => [status, chargeType, bookingId, quickFilter, month];
+}
+
+/// Filtro rápido de cobranças na listagem.
+enum RentalChargeQuickFilter {
+  all('Todas'),
+  overdue('Atrasadas'),
+  newCharges('Novas'),
+  paid('Pagas');
+
+  const RentalChargeQuickFilter(this.label);
+  final String label;
+}
+
+bool rentalChargeMatchesFilter(RentalCharge charge, RentalChargeListFilter filter) {
+  if (filter.chargeType != null && charge.chargeType != filter.chargeType) {
+    return false;
+  }
+  if (filter.bookingId != null && charge.bookingId != filter.bookingId) {
+    return false;
+  }
+  if (filter.month != null) {
+    final due = charge.dueDate;
+    if (due == null) return false;
+    if (due.year != filter.month!.year || due.month != filter.month!.month) {
+      return false;
+    }
+  }
+  switch (filter.quickFilter) {
+    case RentalChargeQuickFilter.all:
+      break;
+    case RentalChargeQuickFilter.overdue:
+      if (!charge.isOverdue) return false;
+    case RentalChargeQuickFilter.newCharges:
+      if (!charge.canConfirmPayment || charge.isOverdue) return false;
+    case RentalChargeQuickFilter.paid:
+      if (!charge.isPaid) return false;
+  }
+  return true;
 }
 
 class RentalPropertyInput extends Equatable {
@@ -98,6 +212,12 @@ class RentalPropertyInput extends Equatable {
     this.baseDailyRate,
     this.depositAmount,
     this.status = 'active',
+    this.registryMatricula,
+    this.registryCartorio,
+    this.iptuInscription,
+    this.municipalInscription,
+    this.isFurnished,
+    this.acceptsPets,
   });
 
   final String companyId;
@@ -125,6 +245,12 @@ class RentalPropertyInput extends Equatable {
   final double? baseDailyRate;
   final double? depositAmount;
   final String status;
+  final String? registryMatricula;
+  final String? registryCartorio;
+  final String? iptuInscription;
+  final String? municipalInscription;
+  final bool? isFurnished;
+  final bool? acceptsPets;
 
   @override
   List<Object?> get props => [title, companyId];
@@ -140,6 +266,21 @@ class RentalPartyInput extends Equatable {
     this.documentNumber,
     this.notes,
     this.status = 'active',
+    this.isRentalRestricted,
+    this.restrictionReason,
+    this.addressStreet,
+    this.addressNumber,
+    this.addressComplement,
+    this.addressNeighborhood,
+    this.addressCity,
+    this.addressState,
+    this.addressZip,
+    this.intakeMetadata,
+    this.nationality,
+    this.rgNumber,
+    this.rgIssuer,
+    this.profession,
+    this.maritalStatus,
   });
 
   final String companyId;
@@ -150,9 +291,41 @@ class RentalPartyInput extends Equatable {
   final String? documentNumber;
   final String? notes;
   final String status;
+  final bool? isRentalRestricted;
+  final String? restrictionReason;
+  final String? addressStreet;
+  final String? addressNumber;
+  final String? addressComplement;
+  final String? addressNeighborhood;
+  final String? addressCity;
+  final String? addressState;
+  final String? addressZip;
+  final Map<String, dynamic>? intakeMetadata;
+  final String? nationality;
+  final String? rgNumber;
+  final String? rgIssuer;
+  final String? profession;
+  final String? maritalStatus;
 
   @override
   List<Object?> get props => [fullName, companyId, category];
+}
+
+class TerminateLeaseInput extends Equatable {
+  const TerminateLeaseInput({
+    required this.endDate,
+    this.terminationReason,
+    this.applyTenantRestriction = false,
+    this.restrictionReason,
+  });
+
+  final DateTime endDate;
+  final String? terminationReason;
+  final bool applyTenantRestriction;
+  final String? restrictionReason;
+
+  @override
+  List<Object?> get props => [endDate, applyTenantRestriction];
 }
 
 class RentalLeaseInput extends Equatable {
@@ -170,6 +343,7 @@ class RentalLeaseInput extends Equatable {
     this.depositAmount,
     this.dueDayOfMonth,
     this.notes,
+    this.contractTerms = RentalLeaseContractTerms.empty,
   });
 
   final String companyId;
@@ -185,6 +359,7 @@ class RentalLeaseInput extends Equatable {
   final double? depositAmount;
   final int? dueDayOfMonth;
   final String? notes;
+  final RentalLeaseContractTerms contractTerms;
 
   @override
   List<Object?> get props => [propertyId, startDate];
@@ -206,6 +381,9 @@ class RentalBookingInput extends Equatable {
     this.guestsCount = 1,
     this.nightlyRate,
     this.totalAmount,
+    this.isFixedRent = false,
+    this.monthlyRent,
+    this.paymentDueDay,
     this.notes,
   });
 
@@ -223,6 +401,9 @@ class RentalBookingInput extends Equatable {
   final DateTime checkOut;
   final double? nightlyRate;
   final double? totalAmount;
+  final bool isFixedRent;
+  final double? monthlyRent;
+  final int? paymentDueDay;
   final String? notes;
 
   @override

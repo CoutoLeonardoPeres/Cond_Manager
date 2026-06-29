@@ -32,7 +32,8 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
     ticket:tickets!work_orders_ticket_id_fkey ( ticket_number, title ),
     internal:profiles!work_orders_internal_responsible_id_fkey ( full_name ),
     provider:providers ( trade_name, legal_name ),
-    creator:profiles!work_orders_created_by_fkey ( full_name )
+    creator:profiles!work_orders_created_by_fkey ( full_name ),
+    rental_property:rental_properties ( title )
   ''';
 
   static const _internalRoles = [
@@ -53,6 +54,12 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
       }
       if (filter.status != null) {
         query = query.eq('status', filter.status!.value);
+      }
+      if (filter.rentalExpensesOnly) {
+        query = query.not('rental_property_id', 'is', null);
+      }
+      if (filter.rentalPropertyId != null) {
+        query = query.eq('rental_property_id', filter.rentalPropertyId!);
       }
 
       final data = await query.order('created_at', ascending: false);
@@ -127,6 +134,34 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
       return Failure(_mapError(e));
     } catch (e) {
       return Failure(NetworkException('Erro ao criar ordem de serviço: $e'));
+    }
+  }
+
+  @override
+  Future<Result<WorkOrder>> updateHeader(
+    String id,
+    WorkOrderHeaderUpdateInput input,
+  ) async {
+    try {
+      if (_client.auth.currentUser?.id == null) {
+        return const Failure(AppAuthException('Usuário não autenticado.'));
+      }
+
+      final payload = WorkOrderModel.headerUpdatePayload(input);
+      final row = await _client
+          .from('work_orders')
+          .update(payload)
+          .eq('id', id)
+          .select(_select)
+          .single();
+
+      return Success(
+        WorkOrderModel.fromJson(row as Map<String, dynamic>).toEntity(),
+      );
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao atualizar despesa: $e'));
     }
   }
 

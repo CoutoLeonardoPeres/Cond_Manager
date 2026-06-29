@@ -15,6 +15,7 @@ class RentalBooking extends Equatable {
     required this.guestName,
     this.guestEmail,
     this.guestPhone,
+    this.guestDocumentNumber,
     this.guestPartyId,
     required this.guestsCount,
     required this.checkIn,
@@ -22,6 +23,9 @@ class RentalBooking extends Equatable {
     this.nightlyRate,
     this.totalAmount,
     this.paidAmount,
+    this.isFixedRent = false,
+    this.monthlyRent,
+    this.paymentDueDay,
     this.notes,
   });
 
@@ -36,6 +40,7 @@ class RentalBooking extends Equatable {
   final String guestName;
   final String? guestEmail;
   final String? guestPhone;
+  final String? guestDocumentNumber;
   final String? guestPartyId;
   final int guestsCount;
   final DateTime checkIn;
@@ -43,6 +48,9 @@ class RentalBooking extends Equatable {
   final double? nightlyRate;
   final double? totalAmount;
   final double? paidAmount;
+  final bool isFixedRent;
+  final double? monthlyRent;
+  final int? paymentDueDay;
   final String? notes;
 
   int get nights => checkOut.difference(checkIn).inDays;

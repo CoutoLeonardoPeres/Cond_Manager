@@ -10,5 +10,6 @@ export 'clay_surface.dart';
 export 'clay_text_field.dart';
 export 'clay_masked_field.dart';
 export 'clay_dropdown_field.dart';
+export 'clay_searchable_dropdown_field.dart';
 export 'package:cond_manager/shared/widgets/form/clay_form_grid.dart';
 export 'package:cond_manager/shared/widgets/form/address_cep_autofill.dart';

@@ -6,6 +6,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
 import 'package:cond_manager/shared/domain/enums/rental_charge_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_charge_type.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_charge_payment_dialog.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -128,20 +129,13 @@ class _RentalChargeFormPageState extends ConsumerState<RentalChargeFormPage> {
   Future<void> _markPaidAndSync() async {
     if (!widget.isEditing || _isPaid) return;
 
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Marcar como pago?'),
-        content: const Text(
-          'A cobrança será marcada como paga e um lançamento será criado no financeiro.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirmar')),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    final chargeResult = await ref.read(rentalRepositoryProvider).getCharge(widget.chargeId!);
+    RentalCharge? charge;
+    chargeResult.when(success: (c) => charge = c, failure: (_) {});
+    if (charge == null || !mounted) return;
+
+    final confirmation = await RentalChargePaymentDialog.show(context, charge: charge!);
+    if (confirmation == null || !mounted) return;
 
     setState(() {
       _markingPaid = true;
@@ -150,6 +144,9 @@ class _RentalChargeFormPageState extends ConsumerState<RentalChargeFormPage> {
 
     final result = await ref.read(rentalRepositoryProvider).markChargePaid(
           widget.chargeId!,
+          paymentMethod: confirmation.paymentMethod,
+          paidAmount: confirmation.paidAmount,
+          paidAt: confirmation.paidAt,
           syncFinancial: true,
         );
 
@@ -159,7 +156,11 @@ class _RentalChargeFormPageState extends ConsumerState<RentalChargeFormPage> {
         ref.invalidate(rentalChargesListProvider);
         ref.invalidate(rentalChargeDetailProvider(widget.chargeId!));
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cobrança paga e lançada no financeiro.')),
+          SnackBar(
+            content: Text(
+              'Cobrança paga via ${confirmation.paymentMethod.label} e lançada no financeiro.',
+            ),
+          ),
         );
         context.go(resolveReturnPath(context, fallback: '/rental/charges'));
       },

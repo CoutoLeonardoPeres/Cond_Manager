@@ -1,3 +1,4 @@
+import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/core/router/navigation_helpers.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
@@ -52,6 +53,10 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
   final _baseRentController = TextEditingController();
   final _baseDailyController = TextEditingController();
   final _depositController = TextEditingController();
+  final _matriculaController = TextEditingController();
+  final _cartorioController = TextEditingController();
+  final _iptuController = TextEditingController();
+  final _municipalController = TextEditingController();
 
   RentalPropertyType _propertyType = RentalPropertyType.apartment;
   RentalListingMode _listingMode = RentalListingMode.longTerm;
@@ -64,6 +69,8 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
   bool _inclusionsLoaded = false;
   bool _photosLoaded = false;
   bool _cepLoading = false;
+  bool? _isFurnished;
+  bool? _acceptsPets;
   List<RentalPropertyInclusionInput> _inclusions = [];
   List<RentalPropertyPhotoDraft> _photos = [];
   List<RentalPropertyPhotoDraft> _initialPhotos = [];
@@ -114,6 +121,10 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
     _baseRentController.dispose();
     _baseDailyController.dispose();
     _depositController.dispose();
+    _matriculaController.dispose();
+    _cartorioController.dispose();
+    _iptuController.dispose();
+    _municipalController.dispose();
     _cepAutofill.detach();
     super.dispose();
   }
@@ -126,6 +137,24 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
   int? _parseInt(String text) {
     final v = int.tryParse(text.trim());
     return v != null && v > 0 ? v : null;
+  }
+
+  void _applyCondominiumAddress(Condominium condo) {
+    _address.pauseCepLookup();
+    ClayMaskedField.setCep(_zipController, condo.zipCode);
+    _streetController.text = condo.street ?? '';
+    _numberController.text = condo.number ?? '';
+    _neighborhoodController.text = condo.neighborhood ?? '';
+    _cityController.text = condo.city;
+    _stateController.text = condo.state;
+    _address.resumeCepLookup();
+  }
+
+  void _onCondominiumChanged(Condominium? condo) {
+    setState(() {
+      _condominium = condo;
+      if (condo != null) _applyCondominiumAddress(condo);
+    });
   }
 
   void _fill(RentalProperty p, List<Condominium> condos, List<RentalParty> parties) {
@@ -150,6 +179,12 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
     if (p.baseRentAmount != null) _baseRentController.text = p.baseRentAmount.toString();
     if (p.baseDailyRate != null) _baseDailyController.text = p.baseDailyRate.toString();
     if (p.depositAmount != null) _depositController.text = p.depositAmount.toString();
+    _matriculaController.text = p.registryMatricula ?? '';
+    _cartorioController.text = p.registryCartorio ?? '';
+    _iptuController.text = p.iptuInscription ?? '';
+    _municipalController.text = p.municipalInscription ?? '';
+    _isFurnished = p.isFurnished;
+    _acceptsPets = p.acceptsPets;
     _propertyType = p.propertyType;
     _listingMode = p.listingMode;
     _status = p.status;
@@ -192,6 +227,17 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
         baseDailyRate: _parseDouble(_baseDailyController.text),
         depositAmount: _parseDouble(_depositController.text),
         status: _status,
+        registryMatricula: _matriculaController.text.trim().isEmpty
+            ? null
+            : _matriculaController.text.trim(),
+        registryCartorio:
+            _cartorioController.text.trim().isEmpty ? null : _cartorioController.text.trim(),
+        iptuInscription: _iptuController.text.trim().isEmpty ? null : _iptuController.text.trim(),
+        municipalInscription: _municipalController.text.trim().isEmpty
+            ? null
+            : _municipalController.text.trim(),
+        isFurnished: _isFurnished,
+        acceptsPets: _acceptsPets,
       );
 
   Future<void> _submit() async {
@@ -307,8 +353,67 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
     }
   }
 
+  Future<void> _confirmDelete() async {
+    final title = _titleController.text.trim().isEmpty
+        ? 'este imóvel'
+        : '"${_titleController.text.trim()}"';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir imóvel'),
+        content: Text(
+          'Tem certeza que deseja excluir $title?\n\n'
+          'Reservas, contratos e cobranças vinculados também serão removidos. '
+          'Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Excluir', style: TextStyle(color: ClayTokens.error)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final result = await ref.read(rentalRepositoryProvider).deleteProperty(widget.propertyId!);
+    if (!mounted) return;
+
+    result.when(
+      success: (_) {
+        ref.invalidate(rentalPropertiesListProvider);
+        ref.invalidate(rentalGanttBookingsProvider);
+        ref.invalidate(rentalGanttLeasesProvider);
+        context.go(resolveReturnPath(context, fallback: '/rental/properties'));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Imóvel excluído com sucesso.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+      failure: (e) => setState(() {
+        _loading = false;
+        _error = e.message;
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final canManage =
+        ref.watch(currentProfileProvider).value?.permissions.canManageRental ?? false;
     final condosAsync = ref.watch(accessibleCondominiumsProvider);
     final partiesAsync = ref.watch(rentalPartiesListProvider);
     final condos = condosAsync.value ?? const <Condominium>[];
@@ -463,7 +568,14 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
                               value: _condominium,
                               items: [null, ...list],
                               itemLabel: (c) => c?.name ?? '—',
-                              onChanged: (v) => setState(() => _condominium = v),
+                              onChanged: _onCondominiumChanged,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Ao selecionar, o endereço do condomínio preenche os campos abaixo (você pode alterar).',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: ClayTokens.textMuted,
+                                  ),
                             ),
                             if (list.isEmpty) ...[
                               const SizedBox(height: 8),
@@ -692,18 +804,92 @@ class _RentalPropertyFormPageState extends ConsumerState<RentalPropertyFormPage>
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    width: columns >= 3 ? 220 : double.infinity,
-                    child: ClayButton(
-                      label: widget.isEditing ? 'Salvar' : 'Cadastrar',
-                      icon: Icons.save_rounded,
-                      isLoading: _loading,
-                      onPressed: _loading ? null : _submit,
+                const SizedBox(height: 16),
+                FormGridSection(
+                  title: 'Dados para contrato',
+                  columns: columns,
+                  items: [
+                    FormGridField(
+                      child: ClayTextField(
+                        controller: _matriculaController,
+                        label: 'Matrícula',
+                      ),
                     ),
-                  ),
+                    FormGridField(
+                      child: ClayTextField(
+                        controller: _cartorioController,
+                        label: 'Cartório',
+                      ),
+                    ),
+                    FormGridField(
+                      child: ClayTextField(
+                        controller: _iptuController,
+                        label: 'Inscrição IPTU',
+                      ),
+                    ),
+                    FormGridField(
+                      child: ClayTextField(
+                        controller: _municipalController,
+                        label: 'Inscrição municipal',
+                      ),
+                    ),
+                    FormGridField(
+                      span: columns,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Imóvel mobiliado'),
+                            subtitle: const Text(
+                              'Usado no contrato de locação (PDF).',
+                              style: TextStyle(fontSize: 12, color: ClayTokens.textMuted),
+                            ),
+                            value: _isFurnished,
+                            tristate: true,
+                            onChanged: (v) => setState(() => _isFurnished = v),
+                          ),
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Aceita pets'),
+                            subtitle: const Text(
+                              'Usado no contrato de locação (PDF).',
+                              style: TextStyle(fontSize: 12, color: ClayTokens.textMuted),
+                            ),
+                            value: _acceptsPets,
+                            tristate: true,
+                            onChanged: (v) => setState(() => _acceptsPets = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    if (widget.isEditing && canManage) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _loading ? null : _confirmDelete,
+                          icon: const Icon(Icons.delete_outline_rounded, color: ClayTokens.error),
+                          label: const Text(
+                            'Excluir',
+                            style: TextStyle(color: ClayTokens.error),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: ClayButton(
+                        label: widget.isEditing ? 'Salvar' : 'Cadastrar',
+                        icon: Icons.save_rounded,
+                        isLoading: _loading,
+                        onPressed: _loading ? null : _submit,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

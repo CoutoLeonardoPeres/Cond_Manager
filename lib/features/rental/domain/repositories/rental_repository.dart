@@ -8,6 +8,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_inclusion_ca
 import 'package:cond_manager/features/rental/domain/entities/rental_property_inclusion.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property_photo.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property_pnl.dart';
+import 'package:cond_manager/shared/domain/enums/rental_lease_contract_enums.dart';
 
 abstract class RentalRepository {
   Future<Result<List<RentalProperty>>> listProperties(RentalPropertyListFilter filter);
@@ -17,6 +18,8 @@ abstract class RentalRepository {
   Future<Result<RentalProperty>> createProperty(RentalPropertyInput input);
 
   Future<Result<RentalProperty>> updateProperty(String id, RentalPropertyInput input);
+
+  Future<Result<void>> deleteProperty(String id);
 
   Future<Result<List<RentalPropertyInclusion>>> listPropertyInclusions(String propertyId);
 
@@ -51,6 +54,13 @@ abstract class RentalRepository {
 
   Future<Result<RentalParty>> updateParty(String id, RentalPartyInput input);
 
+  Future<Result<RentalParty?>> findPartyByDocumentOrPhone({
+    required String companyId,
+    String? documentNumber,
+    String? phone,
+    String? excludePartyId,
+  });
+
   Future<Result<List<RentalLease>>> listLeases();
 
   Future<Result<RentalLease>> getLease(String id);
@@ -58,6 +68,8 @@ abstract class RentalRepository {
   Future<Result<RentalLease>> createLease(RentalLeaseInput input);
 
   Future<Result<RentalLease>> updateLease(String id, RentalLeaseInput input);
+
+  Future<Result<RentalLease>> terminateLease(String id, TerminateLeaseInput input);
 
   Future<Result<List<RentalBooking>>> listBookings({
     DateTime? from,
@@ -71,6 +83,9 @@ abstract class RentalRepository {
 
   Future<Result<RentalBooking>> updateBooking(String id, RentalBookingInput input);
 
+  /// Gera cobranças de aluguel pendentes para o mês quando a data de vencimento é atingida.
+  Future<Result<int>> generateMonthlyCharges({DateTime? asOf});
+
   Future<Result<List<RentalCharge>>> listCharges(RentalChargeListFilter filter);
 
   Future<Result<RentalCharge>> getCharge(String id);
@@ -79,7 +94,13 @@ abstract class RentalRepository {
 
   Future<Result<RentalCharge>> updateCharge(String id, RentalChargeInput input);
 
-  Future<Result<RentalCharge>> markChargePaid(String chargeId, {bool syncFinancial = true});
+  Future<Result<RentalCharge>> markChargePaid(
+    String chargeId, {
+    required RentalPaymentMethod paymentMethod,
+    required double paidAmount,
+    required DateTime paidAt,
+    bool syncFinancial = true,
+  });
 
   Future<Result<String>> syncChargeToFinancial(String chargeId);
 

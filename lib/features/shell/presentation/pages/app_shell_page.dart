@@ -41,6 +41,7 @@ class AppShellPage extends ConsumerWidget {
     _NavItem('/rental/calendar', Icons.view_timeline_rounded, 'Ocupação'),
     _NavItem('/rental/parties', Icons.people_rounded, 'Pessoas'),
     _NavItem('/rental/charges', Icons.payments_rounded, 'Cobranças'),
+    _NavItem('/rental/expenses', Icons.receipt_long_rounded, 'Despesas'),
     _NavItem('/rental/reports', Icons.assessment_rounded, 'Relatórios'),
   ];
 

@@ -41,10 +41,15 @@ import 'package:cond_manager/features/rental/presentation/pages/rental_bookings_
 import 'package:cond_manager/features/rental/presentation/pages/rental_calendar_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_charge_form_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_charges_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_expense_detail_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_expense_form_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_expenses_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_dashboard_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_lease_form_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_leases_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_parties_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/rental_tenant_intake_link_page.dart';
+import 'package:cond_manager/features/rental/presentation/pages/public_tenant_intake_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_party_form_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_properties_page.dart';
 import 'package:cond_manager/features/rental/presentation/pages/rental_property_form_page.dart';
@@ -62,19 +67,26 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);
       final isLoggedIn = authState.value?.session != null;
-      final isAuthRoute = state.matchedLocation.startsWith('/login') ||
-          state.matchedLocation.startsWith('/register') ||
-          state.matchedLocation.startsWith('/forgot-password');
-      final isInviteRoute = state.matchedLocation.startsWith('/invite/');
+      final path = state.uri.path;
+      final isAuthRoute = path.startsWith('/login') ||
+          path.startsWith('/register') ||
+          path.startsWith('/forgot-password');
+      final isInviteRoute = path.startsWith('/invite/');
+      final isPublicIntakeRoute = path.startsWith('/cadastro-locatario/');
 
-      if (!isLoggedIn && !isAuthRoute && !isInviteRoute) return '/login';
+      if (!isLoggedIn && !isAuthRoute && !isInviteRoute && !isPublicIntakeRoute) {
+        return '/login';
+      }
       if (isLoggedIn && isAuthRoute) {
         final profile = ref.read(currentProfileProvider).valueOrNull;
         return profile?.permissions.homeRoute ?? '/';
       }
+      // Rotas públicas — não redirecionar para o painel (manutenção/locação).
+      if (isInviteRoute || isPublicIntakeRoute) return null;
+
       if (isLoggedIn && !isAuthRoute) {
         final profile = ref.read(currentProfileProvider).valueOrNull;
-        if (profile != null && !profile.permissions.canAccessRoute(state.matchedLocation)) {
+        if (profile != null && !profile.permissions.canAccessRoute(path)) {
           final active =
               ref.read(activeAppModuleProvider) ?? profile.modules.defaultModule;
           return profile.permissions.homeRouteForModule(active);
@@ -98,6 +110,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/invite/:token',
         builder: (_, state) => AcceptInvitePage(
+          token: state.pathParameters['token']!,
+        ),
+      ),
+      GoRoute(
+        path: '/cadastro-locatario/:token',
+        builder: (_, state) => PublicTenantIntakePage(
           token: state.pathParameters['token']!,
         ),
       ),
@@ -310,7 +328,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/rental/bookings/new',
-            builder: (_, _) => const RentalBookingFormPage(),
+            builder: (_, state) => RentalBookingFormPage(
+              initialPropertyId: state.uri.queryParameters['propertyId'],
+            ),
           ),
           GoRoute(
             path: '/rental/bookings/:id/edit',
@@ -321,6 +341,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/rental/bookings',
             builder: (_, _) => const RentalBookingsPage(),
+          ),
+          GoRoute(
+            path: '/rental/parties/intake-link',
+            builder: (_, _) => const RentalTenantIntakeLinkPage(),
           ),
           GoRoute(
             path: '/rental/parties/new',
@@ -349,6 +373,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/rental/charges',
             builder: (_, _) => const RentalChargesPage(),
+          ),
+          GoRoute(
+            path: '/rental/expenses/new',
+            builder: (_, _) => const RentalExpenseFormPage(),
+          ),
+          GoRoute(
+            path: '/rental/expenses/:id/edit',
+            builder: (_, state) => RentalExpenseFormPage(
+              expenseId: state.pathParameters['id'],
+            ),
+          ),
+          GoRoute(
+            path: '/rental/expenses/:id',
+            builder: (_, state) => RentalExpenseDetailPage(
+              expenseId: state.pathParameters['id']!,
+            ),
+          ),
+          GoRoute(
+            path: '/rental/expenses',
+            builder: (_, _) => const RentalExpensesPage(),
           ),
           GoRoute(
             path: '/rental/calendar',

@@ -179,10 +179,15 @@ class TicketListFilter extends Equatable {
 }
 
 class UnitOption extends Equatable {
-  const UnitOption({required this.id, required this.label});
+  const UnitOption({
+    required this.id,
+    required this.label,
+    this.areaSqm,
+  });
 
   final String id;
   final String label;
+  final double? areaSqm;
 
   @override
   List<Object?> get props => [id];

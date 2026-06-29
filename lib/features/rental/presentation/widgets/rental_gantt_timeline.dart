@@ -165,3 +165,54 @@ List<RentalProperty> rentalGanttSortedProperties(List<RentalProperty> properties
   list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
   return list;
 }
+
+/// Imóvel ocupado em [date] por reserva (não cancelada) ou contrato ativo.
+bool rentalPropertyIsOccupiedOnDate({
+  required String propertyId,
+  required DateTime date,
+  required List<RentalBooking> bookings,
+  required List<RentalLease> leases,
+}) {
+  final day = rentalGanttDateOnly(date);
+
+  for (final booking in bookings) {
+    if (booking.propertyId != propertyId) continue;
+    if (booking.status == RentalBookingStatus.cancelled) continue;
+    final start = rentalGanttDateOnly(booking.checkIn);
+    final end = rentalGanttDateOnly(booking.checkOut);
+    if (!day.isBefore(start) && day.isBefore(end)) return true;
+  }
+
+  for (final lease in leases) {
+    if (lease.propertyId != propertyId) continue;
+    if (lease.status != RentalLeaseStatus.active) continue;
+    final start = rentalGanttDateOnly(lease.startDate);
+    if (day.isBefore(start)) continue;
+    if (lease.endDate != null && day.isAfter(rentalGanttDateOnly(lease.endDate!))) {
+      continue;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+List<RentalProperty> rentalVacantProperties({
+  required List<RentalProperty> properties,
+  required List<RentalBooking> bookings,
+  required List<RentalLease> leases,
+  DateTime? onDate,
+}) {
+  final day = rentalGanttDateOnly(onDate ?? DateTime.now());
+  final vacant = properties.where((p) {
+    if (p.status != 'active') return false;
+    return !rentalPropertyIsOccupiedOnDate(
+      propertyId: p.id,
+      date: day,
+      bookings: bookings,
+      leases: leases,
+    );
+  }).toList();
+  vacant.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+  return vacant;
+}

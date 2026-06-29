@@ -1,0 +1,10 @@
+# SPA fallback — necessário para links diretos (ex.: /cadastro-locatario/TOKEN) em hospedagem estática.
+# Apache: copie para public_html/.htaccess ou equivalente.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

@@ -1,0 +1,7 @@
+-- Reparo: cobranças de aluguel duplicadas (contrato + reserva fixa, mesmo imóvel/mês)
+--
+-- Use os arquivos separados (não execute este README como SQL):
+--   1. repair_duplicate_rental_charges_preview.sql  → conferir duplicatas
+--   2. repair_duplicate_rental_charges_apply.sql    → apagar duplicatas
+--
+-- Mantém cobrança do CONTRATO e apaga a da RESERVA.

@@ -2,7 +2,9 @@ import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
-import 'package:cond_manager/shared/domain/enums/rental_charge_status.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_charge_tile.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_charges_board.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_list_filters_bar.dart';
 import 'package:cond_manager/shared/domain/enums/rental_charge_type.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
@@ -13,13 +15,22 @@ import 'package:intl/intl.dart';
 class RentalChargesPage extends ConsumerWidget {
   const RentalChargesPage({super.key});
 
+  List<RentalCharge> _applyFilters(List<RentalCharge> charges, RentalChargeListFilter filter) {
+    final base = filter.copyWith(quickFilter: RentalChargeQuickFilter.all);
+    return charges.where((c) => rentalChargeMatchesFilter(c, base)).toList();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(rentalChargeListFilterProvider);
     final chargesAsync = ref.watch(rentalChargesListProvider);
     final currency = NumberFormat.simpleCurrency(locale: 'pt_BR');
     final dateFmt = DateFormat('dd/MM/yyyy');
-    final canCreate = ref.watch(currentProfileProvider).value?.permissions.canManageRental ?? false;
+    final canManage = ref.watch(currentProfileProvider).value?.permissions.canManageRental ?? false;
+
+    void updateFilter(RentalChargeListFilter next) {
+      ref.read(rentalChargeListFilterProvider.notifier).state = next;
+    }
 
     return Stack(
       children: [
@@ -37,34 +48,24 @@ class RentalChargesPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Aluguéis, depósitos, taxas e recebimentos vinculados a contratos e reservas.',
+                    'Novas, atrasadas e pagas organizadas por coluna.',
                     style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClayDropdownField<RentalChargeType?>(
-                          label: 'Tipo',
-                          value: filter.chargeType,
-                          items: [null, ...RentalChargeType.values],
-                          itemLabel: (t) => t?.label ?? 'Todos',
-                          onChanged: (v) => ref.read(rentalChargeListFilterProvider.notifier).state =
-                              filter.copyWith(chargeType: v, clearType: v == null),
-                        ),
+                  RentalListFiltersBar(
+                    month: filter.month,
+                    onMonthChanged: (m) => updateFilter(
+                      filter.copyWith(month: m, clearMonth: m == null),
+                    ),
+                    extra: ClayDropdownField<RentalChargeType?>(
+                      label: 'Tipo',
+                      value: filter.chargeType,
+                      items: [null, ...RentalChargeType.values],
+                      itemLabel: (t) => t?.label ?? 'Todos os tipos',
+                      onChanged: (v) => updateFilter(
+                        filter.copyWith(chargeType: v, clearType: v == null),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ClayDropdownField<RentalChargeStatus?>(
-                          label: 'Status',
-                          value: filter.status,
-                          items: [null, ...RentalChargeStatus.values],
-                          itemLabel: (s) => s?.label ?? 'Todos',
-                          onChanged: (v) => ref.read(rentalChargeListFilterProvider.notifier).state =
-                              filter.copyWith(status: v, clearStatus: v == null),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -74,6 +75,8 @@ class RentalChargesPage extends ConsumerWidget {
                 loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 3)),
                 error: (e, _) => Center(child: Text('$e')),
                 data: (charges) {
+                  final filtered = _applyFilters(charges, filter);
+
                   if (charges.isEmpty) {
                     return Center(
                       child: Column(
@@ -84,7 +87,7 @@ class RentalChargesPage extends ConsumerWidget {
                             style: TextStyle(color: ClayTokens.textSecondary),
                             textAlign: TextAlign.center,
                           ),
-                          if (canCreate) ...[
+                          if (canManage) ...[
                             const SizedBox(height: 16),
                             ClayButton(
                               label: 'Nova cobrança',
@@ -97,17 +100,30 @@ class RentalChargesPage extends ConsumerWidget {
                       ),
                     );
                   }
+
+                  if (filtered.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'Nenhuma cobrança encontrada com os filtros selecionados.',
+                        style: TextStyle(color: ClayTokens.textSecondary),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }
+
                   return RefreshIndicator(
                     onRefresh: () async => ref.invalidate(rentalChargesListProvider),
-                    child: ListView.separated(
-                      padding: EdgeInsets.fromLTRB(20, 0, 20, canCreate ? 88 : 24),
-                      itemCount: charges.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (_, i) => _ChargeTile(
-                        charge: charges[i],
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(20, 0, 20, canManage ? 88 : 24),
+                      child: RentalChargesBoard(
+                        charges: filtered,
                         currency: currency,
                         dateFmt: dateFmt,
-                        onTap: () => context.go('/rental/charges/${charges[i].id}/edit'),
+                        canManage: canManage,
+                        onOpenCharge: (charge) => context.go('/rental/charges/${charge.id}/edit'),
+                        onConfirmPayment: (charge) =>
+                            _confirmChargePayment(context, ref, charge),
                       ),
                     ),
                   );
@@ -116,7 +132,7 @@ class RentalChargesPage extends ConsumerWidget {
             ),
           ],
         ),
-        if (canCreate)
+        if (canManage)
           Positioned(
             right: 20,
             bottom: 20,
@@ -132,42 +148,40 @@ class RentalChargesPage extends ConsumerWidget {
   }
 }
 
-class _ChargeTile extends StatelessWidget {
-  const _ChargeTile({
-    required this.charge,
-    required this.currency,
-    required this.dateFmt,
-    this.onTap,
-  });
-
-  final RentalCharge charge;
-  final NumberFormat currency;
-  final DateFormat dateFmt;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = switch (charge.status) {
-      RentalChargeStatus.paid => ClayTokens.success,
-      RentalChargeStatus.overdue => ClayTokens.error,
-      RentalChargeStatus.cancelled => ClayTokens.textSecondary,
-      _ => ClayTokens.warning,
-    };
-
-    return ClayListTileCard(
-      icon: Icons.payments_rounded,
-      iconColor: statusColor,
-      title: charge.description,
-      subtitle: [
-        charge.chargeType.label,
-        charge.status.label,
-        currency.format(charge.amount),
-        if (charge.propertyTitle != null) charge.propertyTitle,
-        if (charge.partyName != null) charge.partyName,
-        if (charge.dueDate != null) 'Venc.: ${dateFmt.format(charge.dueDate!)}',
-        if (charge.financialRecordId != null) 'No financeiro',
-      ].whereType<String>().join(' · '),
-      onTap: onTap,
-    );
-  }
+Future<void> _confirmChargePayment(
+  BuildContext context,
+  WidgetRef ref,
+  RentalCharge charge,
+) async {
+  final currency = NumberFormat.simpleCurrency(locale: 'pt_BR');
+  await confirmRentalChargePayment(
+    context,
+    charge: charge,
+    onPaid: (confirmation) async {
+      final result = await ref.read(rentalRepositoryProvider).markChargePaid(
+            charge.id,
+            paymentMethod: confirmation.paymentMethod,
+            paidAmount: confirmation.paidAmount,
+            paidAt: confirmation.paidAt,
+          );
+      if (!context.mounted) return;
+      result.when(
+        success: (_) {
+          ref.invalidate(rentalChargesListProvider);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Pagamento de ${currency.format(confirmation.paidAmount)} confirmado via ${confirmation.paymentMethod.label}.',
+              ),
+            ),
+          );
+        },
+        failure: (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message)),
+          );
+        },
+      );
+    },
+  );
 }

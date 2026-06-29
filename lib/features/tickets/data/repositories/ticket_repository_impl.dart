@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:cond_manager/core/errors/app_exception.dart' show AppAuthException, AppException, NetworkException, PermissionException;
 import 'package:cond_manager/core/utils/result.dart';
+import 'package:cond_manager/core/utils/unit_display_label.dart';
 import 'package:cond_manager/features/tickets/data/models/status_change_log_model.dart';
 import 'package:cond_manager/features/tickets/data/models/ticket_model.dart';
 import 'package:cond_manager/features/tickets/domain/entities/status_change_log.dart';
@@ -424,28 +425,55 @@ class TicketRepositoryImpl implements TicketRepository {
   @override
   Future<Result<List<UnitOption>>> listUnits(String condominiumId) async {
     try {
-      final data = await _client
-          .from('units')
-          .select('id, identifier')
-          .eq('condominium_id', condominiumId)
-          .eq('status', 'active')
-          .order('identifier');
-
-      final list = (data as List<dynamic>)
-          .map(
-            (e) => UnitOption(
-              id: e['id'] as String,
-              label: e['identifier'] as String,
-            ),
-          )
-          .toList();
-
-      return Success(list);
+      return Success(await _fetchUnits(condominiumId, withStructureLabels: true));
     } on PostgrestException catch (e) {
-      return Failure(_mapPostgrestError(e));
+      try {
+        return Success(await _fetchUnits(condominiumId, withStructureLabels: false));
+      } on PostgrestException {
+        return Failure(_mapPostgrestError(e));
+      }
     } catch (e) {
       return Failure(NetworkException('Erro ao listar unidades: $e'));
     }
+  }
+
+  Future<List<UnitOption>> _fetchUnits(
+    String condominiumId, {
+    required bool withStructureLabels,
+  }) async {
+    final select = withStructureLabels
+        ? 'id, identifier, area_sqm, block:blocks(name), tower:towers(name)'
+        : 'id, identifier, area_sqm';
+
+    final data = await _client
+        .from('units')
+        .select(select)
+        .eq('condominium_id', condominiumId)
+        .eq('status', 'active')
+        .order('identifier');
+
+    return (data as List<dynamic>)
+        .map(
+          (e) {
+            final block = withStructureLabels ? e['block'] as Map<String, dynamic>? : null;
+            final tower = withStructureLabels ? e['tower'] as Map<String, dynamic>? : null;
+            final identifier = e['identifier'] as String;
+            return UnitOption(
+              id: e['id'] as String,
+              label: withStructureLabels
+                  ? formatUnitDisplayLabel(
+                      identifier: identifier,
+                      blockName: block?['name'] as String?,
+                      towerName: tower?['name'] as String?,
+                    )
+                  : identifier,
+              areaSqm: e['area_sqm'] != null
+                  ? double.tryParse(e['area_sqm'].toString())
+                  : null,
+            );
+          },
+        )
+        .toList();
   }
 
   @override

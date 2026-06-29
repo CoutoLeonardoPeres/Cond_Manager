@@ -43,6 +43,9 @@ class WorkOrder extends Equatable {
     this.internalResponsibleName,
     this.providerName,
     this.createdByName,
+    this.rentalPropertyId,
+    this.rentalPropertyTitle,
+    this.actualCost,
   });
 
   final String id;
@@ -72,6 +75,9 @@ class WorkOrder extends Equatable {
   final String? internalResponsibleName;
   final String? providerName;
   final String? createdByName;
+  final String? rentalPropertyId;
+  final String? rentalPropertyTitle;
+  final double? actualCost;
 
   String get displayNumber => 'OS-${osNumber.toString().padLeft(5, '0')}';
 
@@ -127,25 +133,57 @@ class WorkOrderCreateInput extends Equatable {
 }
 
 class WorkOrderListFilter extends Equatable {
-  const WorkOrderListFilter({this.condominiumId, this.status});
+  const WorkOrderListFilter({
+    this.condominiumId,
+    this.status,
+    this.rentalPropertyId,
+    this.rentalExpensesOnly = false,
+  });
 
   final String? condominiumId;
   final WorkOrderStatus? status;
+  final String? rentalPropertyId;
+  final bool rentalExpensesOnly;
 
   WorkOrderListFilter copyWith({
     String? condominiumId,
     WorkOrderStatus? status,
+    String? rentalPropertyId,
+    bool? rentalExpensesOnly,
     bool clearCondominium = false,
     bool clearStatus = false,
+    bool clearRentalProperty = false,
   }) {
     return WorkOrderListFilter(
       condominiumId: clearCondominium ? null : (condominiumId ?? this.condominiumId),
       status: clearStatus ? null : (status ?? this.status),
+      rentalPropertyId:
+          clearRentalProperty ? null : (rentalPropertyId ?? this.rentalPropertyId),
+      rentalExpensesOnly: rentalExpensesOnly ?? this.rentalExpensesOnly,
     );
   }
 
   @override
-  List<Object?> get props => [condominiumId, status];
+  List<Object?> get props => [condominiumId, status, rentalPropertyId, rentalExpensesOnly];
+}
+
+class WorkOrderHeaderUpdateInput extends Equatable {
+  const WorkOrderHeaderUpdateInput({
+    required this.title,
+    required this.serviceType,
+    required this.priority,
+    this.description,
+    this.rentalPropertyId,
+  });
+
+  final String title;
+  final String? description;
+  final ServiceType serviceType;
+  final PriorityLevel priority;
+  final String? rentalPropertyId;
+
+  @override
+  List<Object?> get props => [title, serviceType, priority, rentalPropertyId];
 }
 
 class InternalStaffOption extends Equatable {

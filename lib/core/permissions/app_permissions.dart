@@ -183,6 +183,7 @@ class AppPermissions {
         '/rental/calendar',
         '/rental/parties',
         '/rental/charges',
+        '/rental/expenses',
         '/rental/reports',
       ];
     }

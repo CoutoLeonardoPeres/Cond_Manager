@@ -21,4 +21,7 @@ enum RentalPartyCategory {
 
   /// Pessoas elegíveis como inquilino/locatário em contratos.
   bool get canBeLeaseTenant => this == tenant || this == occupant;
+
+  /// Pessoas elegíveis em reservas (curta temporada).
+  bool get canBeBookingGuest => this == guest || canBeLeaseTenant;
 }

@@ -1,0 +1,31 @@
+-- Termos contratuais adicionais para geração de PDF e gestão do contrato.
+-- adjustment_index já existe em rental_leases (00028).
+
+ALTER TABLE rental_leases
+  ADD COLUMN IF NOT EXISTS adjustment_period_months SMALLINT,
+  ADD COLUMN IF NOT EXISTS guarantee_type TEXT,
+  ADD COLUMN IF NOT EXISTS guarantee_other_description TEXT,
+  ADD COLUMN IF NOT EXISTS payment_method TEXT,
+  ADD COLUMN IF NOT EXISTS pix_key TEXT,
+  ADD COLUMN IF NOT EXISTS bank_name TEXT,
+  ADD COLUMN IF NOT EXISTS bank_agency TEXT,
+  ADD COLUMN IF NOT EXISTS bank_account TEXT,
+  ADD COLUMN IF NOT EXISTS bank_account_type TEXT,
+  ADD COLUMN IF NOT EXISTS bank_holder TEXT,
+  ADD COLUMN IF NOT EXISTS bank_holder_document TEXT,
+  ADD COLUMN IF NOT EXISTS late_fee_percent NUMERIC(5, 2),
+  ADD COLUMN IF NOT EXISTS interest_percent NUMERIC(5, 2),
+  ADD COLUMN IF NOT EXISTS termination_penalty_months SMALLINT,
+  ADD COLUMN IF NOT EXISTS inspection_objection_days SMALLINT,
+  ADD COLUMN IF NOT EXISTS key_delivery_method TEXT,
+  ADD COLUMN IF NOT EXISTS max_occupants SMALLINT,
+  ADD COLUMN IF NOT EXISTS allows_pets BOOLEAN,
+  ADD COLUMN IF NOT EXISTS pets_description TEXT,
+  ADD COLUMN IF NOT EXISTS cancellation_policy TEXT,
+  ADD COLUMN IF NOT EXISTS season_total_amount NUMERIC(14, 2),
+  ADD COLUMN IF NOT EXISTS tenant_charges TEXT,
+  ADD COLUMN IF NOT EXISTS landlord_charges TEXT,
+  ADD COLUMN IF NOT EXISTS witness_1_name TEXT,
+  ADD COLUMN IF NOT EXISTS witness_1_cpf TEXT,
+  ADD COLUMN IF NOT EXISTS witness_2_name TEXT,
+  ADD COLUMN IF NOT EXISTS witness_2_cpf TEXT;

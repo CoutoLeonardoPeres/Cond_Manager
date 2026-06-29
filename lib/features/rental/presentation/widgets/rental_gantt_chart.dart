@@ -18,6 +18,8 @@ class RentalGanttChart extends StatefulWidget {
     required this.viewMode,
     this.propertyColumnWidth = 200,
     this.rowHeight = 52,
+    this.onCellTap,
+    this.onSegmentTap,
   });
 
   final List<RentalProperty> properties;
@@ -27,6 +29,8 @@ class RentalGanttChart extends StatefulWidget {
   final RentalOccupancyViewMode viewMode;
   final double propertyColumnWidth;
   final double rowHeight;
+  final void Function(RentalProperty property, DateTime date)? onCellTap;
+  final void Function(RentalGanttSegment segment)? onSegmentTap;
 
   @override
   State<RentalGanttChart> createState() => _RentalGanttChartState();
@@ -34,6 +38,18 @@ class RentalGanttChart extends StatefulWidget {
 
 class _RentalGanttChartState extends State<RentalGanttChart> {
   static final _borderColor = ClayTokens.textMuted.withValues(alpha: 0.35);
+
+  static bool _isWeekend(DateTime day) =>
+      day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+
+  /// Tom suave — identifica fim de semana sem parecer dia indisponível.
+  static Color _weekendTint({double alpha = 0.06}) =>
+      ClayTokens.accentAlt.withValues(alpha: alpha);
+
+  static Color _gridCellColor({required bool isWeekend, required bool oddRow}) {
+    if (isWeekend) return _weekendTint(alpha: oddRow ? 0.08 : 0.05);
+    return oddRow ? ClayTokens.surfacePressed.withValues(alpha: 0.25) : Colors.transparent;
+  }
 
   final _headerHController = ScrollController();
   final _bodyHController = ScrollController();
@@ -261,7 +277,9 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
                                           colCount: colCount,
                                           rowHeight: widget.rowHeight,
                                           rowCount: properties.length,
+                                          properties: properties,
                                           borderColor: _borderColor,
+                                          onCellTap: widget.onCellTap,
                                         ),
                                         if (todayLeft != null)
                                           Positioned(
@@ -296,6 +314,7 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
                                               colCount: colCount,
                                               rowHeight: widget.rowHeight,
                                               stripe: row.isOdd,
+                                              onSegmentTap: widget.onSegmentTap,
                                             ),
                                           );
                                         }),
@@ -384,7 +403,7 @@ class _OccupancyHeader extends StatelessWidget {
           color: highlight
               ? ClayTokens.primary.withValues(alpha: 0.12)
               : weekend
-                  ? ClayTokens.surfacePressed.withValues(alpha: 0.45)
+                  ? _RentalGanttChartState._weekendTint(alpha: 0.07)
                   : ClayTokens.surfaceRaised,
           border: Border(
             right: BorderSide(color: border),
@@ -400,7 +419,11 @@ class _OccupancyHeader extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w600,
-                  color: highlight ? ClayTokens.primary : ClayTokens.textMuted,
+                  color: highlight
+                      ? ClayTokens.primary
+                      : weekend
+                          ? ClayTokens.accentAlt.withValues(alpha: 0.9)
+                          : ClayTokens.textMuted,
                 ),
               ),
             Text(
@@ -411,7 +434,11 @@ class _OccupancyHeader extends StatelessWidget {
               style: TextStyle(
                 fontSize: viewMode == RentalOccupancyViewMode.day ? 12 : 10,
                 fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
-                color: highlight ? ClayTokens.primary : ClayTokens.textPrimary,
+                color: highlight
+                    ? ClayTokens.primary
+                    : weekend
+                        ? ClayTokens.accentAlt.withValues(alpha: 0.95)
+                        : ClayTokens.textPrimary,
               ),
             ),
           ],
@@ -554,7 +581,9 @@ class _OccupancyGrid extends StatelessWidget {
     required this.colCount,
     required this.rowHeight,
     required this.rowCount,
+    required this.properties,
     required this.borderColor,
+    this.onCellTap,
   });
 
   final RentalGanttRange range;
@@ -563,36 +592,50 @@ class _OccupancyGrid extends StatelessWidget {
   final int colCount;
   final double rowHeight;
   final int rowCount;
+  final List<RentalProperty> properties;
   final Color borderColor;
+  final void Function(RentalProperty property, DateTime date)? onCellTap;
+
+  DateTime _dateForColumn(int colIndex) {
+    if (viewMode == RentalOccupancyViewMode.year) {
+      return DateTime(range.start.year, colIndex + 1, 1);
+    }
+    if (viewMode == RentalOccupancyViewMode.day) {
+      return range.start;
+    }
+    return range.start.add(Duration(days: colIndex));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: List.generate(rowCount, (row) {
+        final property = row < properties.length ? properties[row] : null;
         return SizedBox(
           height: rowHeight,
           child: Row(
             children: List.generate(colCount, (i) {
-              var isWeekend = false;
-              if (viewMode != RentalOccupancyViewMode.year) {
-                final day = range.start.add(Duration(days: i));
-                isWeekend =
-                    day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
-              }
-              return Container(
-                width: colWidth,
-                decoration: BoxDecoration(
-                  color: row.isOdd
-                      ? ClayTokens.surfacePressed.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  border: Border(
-                    right: BorderSide(color: borderColor.withValues(alpha: 0.6)),
-                    bottom: BorderSide(color: borderColor.withValues(alpha: 0.6)),
+              final isWeekend = viewMode != RentalOccupancyViewMode.year &&
+                  _RentalGanttChartState._isWeekend(range.start.add(Duration(days: i)));
+              final date = _dateForColumn(i);
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: property == null || onCellTap == null
+                    ? null
+                    : () => onCellTap!(property, date),
+                child: Container(
+                  width: colWidth,
+                  decoration: BoxDecoration(
+                    color: _RentalGanttChartState._gridCellColor(
+                      isWeekend: isWeekend,
+                      oddRow: row.isOdd,
+                    ),
+                    border: Border(
+                      right: BorderSide(color: borderColor.withValues(alpha: 0.6)),
+                      bottom: BorderSide(color: borderColor.withValues(alpha: 0.6)),
+                    ),
                   ),
                 ),
-                child: isWeekend
-                    ? ColoredBox(color: ClayTokens.surfacePressed.withValues(alpha: 0.12))
-                    : null,
               );
             }),
           ),
@@ -658,6 +701,7 @@ class _PropertyTimelineRow extends StatelessWidget {
     required this.colCount,
     required this.rowHeight,
     required this.stripe,
+    this.onSegmentTap,
   });
 
   final RentalGanttRange range;
@@ -667,6 +711,7 @@ class _PropertyTimelineRow extends StatelessWidget {
   final int colCount;
   final double rowHeight;
   final bool stripe;
+  final void Function(RentalGanttSegment segment)? onSegmentTap;
 
   @override
   Widget build(BuildContext context) {
@@ -676,7 +721,9 @@ class _PropertyTimelineRow extends StatelessWidget {
       children: [
         if (stripe)
           Positioned.fill(
-            child: ColoredBox(color: ClayTokens.surfacePressed.withValues(alpha: 0.08)),
+            child: IgnorePointer(
+              child: ColoredBox(color: ClayTokens.surfacePressed.withValues(alpha: 0.08)),
+            ),
           ),
         for (final segment in segments)
           Positioned(
@@ -684,40 +731,43 @@ class _PropertyTimelineRow extends StatelessWidget {
             width: _segmentWidth(segment).clamp(4.0, double.infinity),
             top: 8,
             height: rowHeight - 16,
-            child: Tooltip(
-              message:
-                  '${segment.label}\n${dateFmt.format(segment.start)} → ${dateFmt.format(segment.end.subtract(const Duration(days: 1)))}',
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: segment.kind == RentalGanttSegmentKind.lease
-                      ? const LinearGradient(
-                          colors: [Color(0xFF34D399), ClayTokens.success],
-                        )
-                      : const LinearGradient(
-                          colors: [ClayTokens.tertiary, ClayTokens.accent],
-                        ),
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (segment.kind == RentalGanttSegmentKind.lease
-                              ? ClayTokens.success
-                              : ClayTokens.tertiary)
-                          .withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+            child: GestureDetector(
+              onTap: onSegmentTap == null ? null : () => onSegmentTap!(segment),
+              child: Tooltip(
+                message:
+                    '${segment.label}\n${dateFmt.format(segment.start)} → ${dateFmt.format(segment.end.subtract(const Duration(days: 1)))}',
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: segment.kind == RentalGanttSegmentKind.lease
+                        ? const LinearGradient(
+                            colors: [Color(0xFF34D399), ClayTokens.success],
+                          )
+                        : const LinearGradient(
+                            colors: [ClayTokens.tertiary, ClayTokens.accent],
+                          ),
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (segment.kind == RentalGanttSegmentKind.lease
+                                ? ClayTokens.success
+                                : ClayTokens.tertiary)
+                            .withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    segment.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  segment.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),

@@ -1,7 +1,10 @@
 import 'package:cond_manager/features/financial/domain/entities/financial_record.dart';
+import 'package:cond_manager/shared/domain/enums/condominium_bill_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_category.dart';
 import 'package:cond_manager/shared/domain/enums/financial_record_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_scope.dart';
+import 'package:cond_manager/shared/domain/enums/rental_expense_entry_type.dart';
+import 'package:cond_manager/shared/domain/enums/service_type.dart';
 
 class FinancialRecordModel {
   FinancialRecordModel({
@@ -28,6 +31,22 @@ class FinancialRecordModel {
     this.notes,
     required this.createdAt,
     required this.updatedAt,
+    this.unitId,
+    this.unitLabel,
+    this.blockId,
+    this.blockName,
+    this.rentalPropertyId,
+    this.rentalPropertyTitle,
+    this.rentalExpenseEntryType,
+    this.condominiumBillType,
+    this.expenseServiceType,
+    this.materialCategoryId,
+    this.materialCategoryName,
+    this.isRecurringTemplate = false,
+    this.recurrenceTemplateId,
+    this.recurrenceDayOfMonth,
+    this.recurrenceActive = true,
+    this.allocationParentId,
   });
 
   final String id;
@@ -53,13 +72,33 @@ class FinancialRecordModel {
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? unitId;
+  final String? unitLabel;
+  final String? blockId;
+  final String? blockName;
+  final String? rentalPropertyId;
+  final String? rentalPropertyTitle;
+  final String? rentalExpenseEntryType;
+  final String? condominiumBillType;
+  final String? expenseServiceType;
+  final String? materialCategoryId;
+  final String? materialCategoryName;
+  final bool isRecurringTemplate;
+  final String? recurrenceTemplateId;
+  final int? recurrenceDayOfMonth;
+  final bool recurrenceActive;
+  final String? allocationParentId;
 
   static const selectQuery = '''
     *,
     condominiums ( name ),
     materials ( name ),
     providers ( trade_name, legal_name ),
-    work_orders ( os_number )
+    work_orders ( os_number ),
+    units ( identifier ),
+    blocks ( name ),
+    rental_properties ( title ),
+    material_categories ( name )
   ''';
 
   factory FinancialRecordModel.fromJson(Map<String, dynamic> json) {
@@ -83,6 +122,28 @@ class FinancialRecordModel {
     int? osNumber;
     final wo = json['work_orders'];
     if (wo is Map<String, dynamic>) osNumber = wo['os_number'] as int?;
+
+    String? unitLabel;
+    final unit = json['units'];
+    if (unit is Map<String, dynamic>) {
+      unitLabel = unit['identifier'] as String?;
+    }
+
+    String? blockName;
+    final block = json['blocks'];
+    if (block is Map<String, dynamic>) {
+      blockName = block['name'] as String?;
+    }
+
+    String? rentalPropertyTitle;
+    final rentalProperty = json['rental_properties'];
+    if (rentalProperty is Map<String, dynamic>) {
+      rentalPropertyTitle = rentalProperty['title'] as String?;
+    }
+
+    String? materialCategoryName;
+    final matCat = json['material_categories'];
+    if (matCat is Map<String, dynamic>) materialCategoryName = matCat['name'] as String?;
 
     return FinancialRecordModel(
       id: json['id'] as String,
@@ -112,6 +173,22 @@ class FinancialRecordModel {
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      unitId: json['unit_id'] as String?,
+      unitLabel: unitLabel,
+      blockId: json['block_id'] as String?,
+      blockName: blockName,
+      rentalPropertyId: json['rental_property_id'] as String?,
+      rentalPropertyTitle: rentalPropertyTitle,
+      rentalExpenseEntryType: json['rental_expense_entry_type'] as String?,
+      condominiumBillType: json['condominium_bill_type'] as String?,
+      expenseServiceType: json['expense_service_type'] as String?,
+      materialCategoryId: json['material_category_id'] as String?,
+      materialCategoryName: materialCategoryName,
+      isRecurringTemplate: json['is_recurring_template'] as bool? ?? false,
+      recurrenceTemplateId: json['recurrence_template_id'] as String?,
+      recurrenceDayOfMonth: json['recurrence_day_of_month'] as int?,
+      recurrenceActive: json['recurrence_active'] as bool? ?? true,
+      allocationParentId: json['allocation_parent_id'] as String?,
     );
   }
 
@@ -143,6 +220,28 @@ class FinancialRecordModel {
         providerId: providerId,
         providerName: providerName,
         notes: notes,
+        unitId: unitId,
+        unitLabel: unitLabel,
+        blockId: blockId,
+        blockName: blockName,
+        rentalPropertyId: rentalPropertyId,
+        rentalPropertyTitle: rentalPropertyTitle,
+        rentalExpenseEntryType: rentalExpenseEntryType != null
+            ? RentalExpenseEntryType.fromValue(rentalExpenseEntryType!)
+            : null,
+        condominiumBillType: condominiumBillType != null
+            ? CondominiumBillType.fromValue(condominiumBillType!)
+            : null,
+        expenseServiceType: expenseServiceType != null
+            ? ServiceType.fromValue(expenseServiceType!)
+            : null,
+        materialCategoryId: materialCategoryId,
+        materialCategoryName: materialCategoryName,
+        isRecurringTemplate: isRecurringTemplate,
+        recurrenceTemplateId: recurrenceTemplateId,
+        recurrenceDayOfMonth: recurrenceDayOfMonth,
+        recurrenceActive: recurrenceActive,
+        allocationParentId: allocationParentId,
         createdAt: createdAt,
         updatedAt: updatedAt,
       );
@@ -171,6 +270,7 @@ class FinancialRecordModel {
       'provider_id': input.providerId,
       'notes': _trim(input.notes),
       'created_by': createdBy,
+      ..._rentalExpensePayload(input),
     };
   }
 
@@ -190,6 +290,47 @@ class FinancialRecordModel {
       'work_order_id': input.workOrderId,
       'provider_id': input.providerId,
       'notes': _trim(input.notes),
+      ..._rentalExpenseUpdatePayload(input),
+    };
+  }
+
+  static Map<String, dynamic> _rentalExpensePayload(FinancialRecordCreateInput input) {
+    if (input.rentalExpenseEntryType == null) return const {};
+    return {
+      'unit_id': input.unitId,
+      'block_id': input.blockId,
+      'rental_property_id': input.rentalPropertyId,
+      'rental_expense_entry_type': input.rentalExpenseEntryType!.value,
+      if (input.condominiumBillType != null)
+        'condominium_bill_type': input.condominiumBillType!.value,
+      if (input.expenseServiceType != null)
+        'expense_service_type': input.expenseServiceType!.value,
+      if (input.materialCategoryId != null) 'material_category_id': input.materialCategoryId,
+      'is_recurring_template': input.isRecurringTemplate,
+      if (input.recurrenceDayOfMonth != null)
+        'recurrence_day_of_month': input.recurrenceDayOfMonth,
+      'recurrence_active': input.recurrenceActive,
+      if (input.allocationParentId != null) 'allocation_parent_id': input.allocationParentId,
+    };
+  }
+
+  static Map<String, dynamic> _rentalExpenseUpdatePayload(FinancialRecordUpdateInput input) {
+    if (input.rentalExpenseEntryType == null) return const {};
+    return {
+      'unit_id': input.unitId,
+      'block_id': input.blockId,
+      'rental_property_id': input.rentalPropertyId,
+      'rental_expense_entry_type': input.rentalExpenseEntryType!.value,
+      if (input.condominiumBillType != null)
+        'condominium_bill_type': input.condominiumBillType!.value,
+      if (input.expenseServiceType != null)
+        'expense_service_type': input.expenseServiceType!.value,
+      if (input.materialCategoryId != null) 'material_category_id': input.materialCategoryId,
+      'is_recurring_template': input.isRecurringTemplate,
+      if (input.recurrenceDayOfMonth != null)
+        'recurrence_day_of_month': input.recurrenceDayOfMonth,
+      'recurrence_active': input.recurrenceActive,
+      if (input.allocationParentId != null) 'allocation_parent_id': input.allocationParentId,
     };
   }
 

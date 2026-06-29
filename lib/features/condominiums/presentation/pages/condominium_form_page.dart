@@ -1,9 +1,12 @@
 import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/core/router/navigation_helpers.dart';
+import 'package:cond_manager/core/utils/result.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
+import 'package:cond_manager/features/condominiums/domain/entities/condominium_block.dart';
 import 'package:cond_manager/features/condominiums/presentation/condominium_route_prefix.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
+import 'package:cond_manager/features/condominiums/presentation/widgets/condominium_blocks_editor.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,6 +58,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
   bool _isLoading = false;
   String? _error;
   bool _loaded = false;
+  final List<String> _pendingBlocks = [];
 
   late final AddressFields _condoAddress;
   late final AddressFields _managerAddress;
@@ -204,12 +208,25 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
 
     if (!mounted) return;
 
-    result.when(
-      success: (condo) {
+    switch (result) {
+      case Success(:final data):
+        final condo = data;
+        if (!widget.isEditing && _pendingBlocks.isNotEmpty) {
+          final blockRepo = ref.read(condominiumBlockRepositoryProvider);
+          for (var i = 0; i < _pendingBlocks.length; i++) {
+            await blockRepo.create(
+              condo.id,
+              CondominiumBlockInput(name: _pendingBlocks[i], sortOrder: i),
+            );
+          }
+        }
+
         ref.invalidate(condominiumsListProvider);
         ref.invalidate(accessibleCondominiumsProvider);
         if (widget.isEditing) {
           ref.invalidate(condominiumDetailProvider(widget.condominiumId!));
+          ref.invalidate(condominiumBlocksProvider(widget.condominiumId!));
+          if (!mounted) return;
           context.go(widget.routePrefix.detail(widget.condominiumId!));
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -219,6 +236,7 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
           );
         } else {
           ref.invalidate(currentProfileProvider);
+          if (!mounted) return;
           final returnPath = resolveReturnPath(context, fallback: widget.routePrefix.list);
           context.go(returnPath);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -228,9 +246,9 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
             ),
           );
         }
-      },
-      failure: (e) => setState(() => _error = e.message),
-    );
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
 
     setState(() => _isLoading = false);
   }
@@ -431,6 +449,19 @@ class _CondominiumFormPageState extends ConsumerState<CondominiumFormPage> {
                 buildAddressFormSection(
                   title: 'Endereço da administradora',
                   fields: _managerAddress,
+                ),
+                const SizedBox(height: 16),
+                CondominiumBlocksEditor(
+                  condominiumId: widget.condominiumId,
+                  columns: columns,
+                  pendingBlocks: widget.isEditing ? null : _pendingBlocks,
+                  onPendingChanged: widget.isEditing
+                      ? null
+                      : (names) => setState(() {
+                            _pendingBlocks
+                              ..clear()
+                              ..addAll(names);
+                          }),
                 ),
                 const SizedBox(height: 24),
                 Align(

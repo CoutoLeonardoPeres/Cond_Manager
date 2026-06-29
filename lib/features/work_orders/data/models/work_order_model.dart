@@ -1,3 +1,4 @@
+import 'package:cond_manager/features/work_orders/data/models/work_order_material_model.dart';
 import 'package:cond_manager/features/work_orders/domain/entities/work_order.dart';
 import 'package:cond_manager/shared/domain/enums/location_type.dart';
 import 'package:cond_manager/shared/domain/enums/priority_level.dart';
@@ -33,6 +34,9 @@ class WorkOrderModel {
     this.internalResponsibleName,
     this.providerName,
     this.createdByName,
+    this.rentalPropertyId,
+    this.rentalPropertyTitle,
+    this.actualCost,
   });
 
   final String id;
@@ -62,6 +66,9 @@ class WorkOrderModel {
   final String? internalResponsibleName;
   final String? providerName;
   final String? createdByName;
+  final String? rentalPropertyId;
+  final String? rentalPropertyTitle;
+  final double? actualCost;
 
   factory WorkOrderModel.fromJson(Map<String, dynamic> json) {
     final condos = json['condominiums'];
@@ -69,6 +76,7 @@ class WorkOrderModel {
     final internal = json['internal'];
     final provider = json['provider'];
     final creator = json['creator'];
+    final rentalProperty = json['rental_property'] ?? json['rental_properties'];
 
     return WorkOrderModel(
       id: json['id'] as String,
@@ -107,6 +115,11 @@ class WorkOrderModel {
           ? (provider['trade_name'] as String? ?? provider['legal_name'] as String?)
           : null,
       createdByName: creator is Map ? creator['full_name'] as String? : null,
+      rentalPropertyId: json['rental_property_id'] as String?,
+      rentalPropertyTitle: rentalProperty is Map ? rentalProperty['title'] as String? : null,
+      actualCost: json['actual_cost'] != null
+          ? WorkOrderMaterialModel.parseNum(json['actual_cost'])
+          : null,
     );
   }
 
@@ -138,6 +151,9 @@ class WorkOrderModel {
         internalResponsibleName: internalResponsibleName,
         providerName: providerName,
         createdByName: createdByName,
+        rentalPropertyId: rentalPropertyId,
+        rentalPropertyTitle: rentalPropertyTitle,
+        actualCost: actualCost,
       );
 
   static Map<String, dynamic> createPayload(
@@ -168,6 +184,24 @@ class WorkOrderModel {
     if (loc != null && loc.isNotEmpty) map['location_description'] = loc;
     if (input.dueDate != null) {
       map['due_date'] = input.dueDate!.toUtc().toIso8601String();
+    }
+    return map;
+  }
+
+  static Map<String, dynamic> headerUpdatePayload(WorkOrderHeaderUpdateInput input) {
+    final map = <String, dynamic>{
+      'title': input.title.trim(),
+      'service_type': input.serviceType.value,
+      'priority': input.priority.value,
+    };
+    final desc = input.description?.trim();
+    if (desc != null && desc.isNotEmpty) {
+      map['description'] = desc;
+    } else {
+      map['description'] = null;
+    }
+    if (input.rentalPropertyId != null) {
+      map['rental_property_id'] = input.rentalPropertyId;
     }
     return map;
   }
