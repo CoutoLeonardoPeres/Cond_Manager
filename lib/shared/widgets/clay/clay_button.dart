@@ -35,9 +35,9 @@ class _ClayButtonState extends State<ClayButton> {
   bool _hovered = false;
 
   double get _height => switch (widget.size) {
-        ClayButtonSize.sm => 44,
-        ClayButtonSize.defaultSize => 56,
-        ClayButtonSize.lg => 64,
+        ClayButtonSize.sm => 40,
+        ClayButtonSize.defaultSize => 48,
+        ClayButtonSize.lg => 56,
       };
 
   @override
@@ -51,30 +51,25 @@ class _ClayButtonState extends State<ClayButton> {
               ? ClayTokens.primaryGradientHover
               : ClayTokens.primaryGradient,
           borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
           boxShadow: pressed
-              ? ClayDecorations.clayPressedShadows()
+              ? null
               : ClayDecorations.clayButtonShadows(hover: _hovered && enabled),
         ),
       ClayButtonVariant.secondary => ClayDecorations.surface(
-          depth: pressed ? ClayDepth.pressed : ClayDepth.button,
-          color: ClayTokens.surfaceRaised,
+          depth: pressed ? ClayDepth.pressed : ClayDepth.raised,
+          color: ClayTokens.cardBg,
           radius: ClayTokens.radiusButton,
         ),
       ClayButtonVariant.outline => BoxDecoration(
           borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
           border: Border.all(
-            color: ClayTokens.accent.withValues(alpha: _hovered ? 1 : 0.25),
-            width: 2,
+            color: ClayTokens.accent.withValues(alpha: _hovered ? 1 : 0.5),
+            width: 1.5,
           ),
-          color: _hovered ? ClayTokens.accent.withValues(alpha: 0.05) : Colors.transparent,
+          color: _hovered ? ClayTokens.accentSurface.withValues(alpha: 0.5) : Colors.transparent,
         ),
       ClayButtonVariant.danger => BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFF87171), ClayTokens.error],
-          ),
+          color: ClayTokens.error,
           borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
           boxShadow: ClayDecorations.clayButtonShadows(),
         ),
@@ -94,11 +89,9 @@ class _ClayButtonState extends State<ClayButton> {
         duration: const Duration(milliseconds: 200),
         height: _height,
         width: widget.expand ? double.infinity : null,
-        padding: widget.expand ? null : const EdgeInsets.symmetric(horizontal: 28),
+        padding: widget.expand ? null : const EdgeInsets.symmetric(horizontal: 24),
         decoration: decoration,
-        transform: Matrix4.identity()
-          ..translate(0.0, _hovered && enabled && !pressed ? -4.0 : 0.0)
-          ..scale(pressed ? 0.92 : 1.0),
+        transform: Matrix4.identity()..scale(pressed ? 0.98 : 1.0),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -119,14 +112,13 @@ class _ClayButtonState extends State<ClayButton> {
                       children: [
                         if (widget.icon != null) ...[
                           Icon(widget.icon, size: 20, color: textColor),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 8),
                         ],
                         Text(
                           widget.label,
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                 color: textColor,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.3,
+                                fontWeight: FontWeight.w600,
                               ),
                         ),
                       ],

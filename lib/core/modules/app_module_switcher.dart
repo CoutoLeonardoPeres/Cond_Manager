@@ -121,28 +121,20 @@ class _ModuleToggleStyle {
     return switch (module) {
       AppModule.maintenance => const _ModuleToggleStyle(
           icon: Icons.build_circle_rounded,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF8B5CF6), ClayTokens.primary],
-          ),
-          gradientHover: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFA78BFA), Color(0xFF7C3AED)],
-          ),
+          gradient: ClayTokens.primaryGradient,
+          gradientHover: ClayTokens.primaryGradientHover,
         ),
       AppModule.rental => const _ModuleToggleStyle(
           icon: Icons.home_work_rounded,
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF22D3EE), Color(0xFF0284C7)],
+            colors: [Color(0xFF80DEEA), ClayTokens.accentAlt],
           ),
           gradientHover: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF67E8F9), Color(0xFF0369A1)],
+            colors: [Color(0xFFB2EBF2), Color(0xFF00838F)],
           ),
         ),
     };

@@ -3,7 +3,6 @@ import 'package:cond_manager/core/modules/app_module_switcher.dart';
 import 'package:cond_manager/core/modules/company_module_access.dart';
 import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/core/theme/app_typography.dart';
-import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:cond_manager/features/access_logs/presentation/providers/access_log_providers.dart';
 import 'package:cond_manager/features/access_logs/presentation/widgets/access_session_scope.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
@@ -90,62 +89,26 @@ class AppShellPage extends ConsumerWidget {
 
     return AccessSessionScope(
       child: ClayScaffold(
+        showOrbs: false,
         appBar: ClayAppBar(
           title: 'Cond Manager · $moduleLabel',
           actions: [
             const AppModuleSwitcher(),
             profileAsync.when(
-              data: (profile) => ClaySurface(
-                depth: ClayDepth.raised,
-                radius: ClayTokens.radiusFull,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        gradient: ClayTokens.primaryGradient,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        (profile?.fullName ?? 'U').substring(0, 1).toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (MediaQuery.sizeOf(context).width > 500) ...[
-                      const SizedBox(width: 10),
-                      Text(
-                        profile?.fullName ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+              data: (profile) => _ProfileChip(name: profile?.fullName ?? ''),
               loading: () => const SizedBox.shrink(),
               error: (_, _) => const SizedBox.shrink(),
             ),
             const SizedBox(width: 8),
-            ClaySurface(
-              depth: ClayDepth.raised,
-              radius: ClayTokens.radiusFull,
-              padding: EdgeInsets.zero,
-              child: IconButton(
-                icon: const Icon(Icons.logout_rounded, size: 22),
-                tooltip: 'Sair',
-                color: ClayTokens.textSecondary,
-                onPressed: () async {
-                  await endAccessSessionTracking(ref);
-                  await ref.read(authRepositoryProvider).signOut();
-                  if (context.mounted) context.go('/login');
-                },
-              ),
+            IconButton(
+              icon: const Icon(Icons.logout_rounded, size: 22),
+              tooltip: 'Sair',
+              color: ClayTokens.muted,
+              onPressed: () async {
+                await endAccessSessionTracking(ref);
+                await ref.read(authRepositoryProvider).signOut();
+                if (context.mounted) context.go('/login');
+              },
             ),
             const SizedBox(width: 4),
           ],
@@ -166,27 +129,66 @@ class AppShellPage extends ConsumerWidget {
             if (isWide)
               MediaQuery(
                 data: MediaQuery.of(context).copyWith(textScaler: AppTypography.navTextScaler),
-                child: SizedBox(
-                  width: 240,
-                  child: ClayNavRail(
-                    items: navItems,
-                    selectedIndex: safeIndex,
-                    onSelected: (i) => context.go(destinations[i].path),
-                  ),
+                child: ClayNavRail(
+                  items: navItems,
+                  selectedIndex: safeIndex,
+                  onSelected: (i) => context.go(destinations[i].path),
                 ),
               ),
             Expanded(
-              child: ClipRRect(
-                borderRadius: isWide
-                    ? const BorderRadius.only(
-                        topLeft: Radius.circular(ClayTokens.radiusHero),
-                      )
-                    : BorderRadius.zero,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: ClayTokens.backgroundGradient,
+                ),
                 child: child,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProfileChip extends StatelessWidget {
+  const _ProfileChip({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final showName = MediaQuery.sizeOf(context).width > 500;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: showName ? 12 : 4, vertical: 4),
+      decoration: BoxDecoration(
+        color: ClayTokens.cardBg,
+        borderRadius: BorderRadius.circular(ClayTokens.radiusFull),
+        border: Border.all(color: ClayTokens.divider),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: ClayTokens.accent,
+            child: Text(
+              (name.isNotEmpty ? name : 'U').substring(0, 1).toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          if (showName) ...[
+            const SizedBox(width: 8),
+            Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+            ),
+          ],
+        ],
       ),
     );
   }

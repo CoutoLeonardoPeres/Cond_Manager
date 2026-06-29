@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:cond_manager/core/theme/clay_decorations.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:flutter/material.dart';
@@ -18,7 +16,7 @@ class ClaySurface extends StatefulWidget {
     this.width,
     this.height,
     this.borderless = false,
-    this.glass = true,
+    this.glass = false,
     this.liftOnHover = false,
   });
 
@@ -56,29 +54,24 @@ class _ClaySurfaceState extends State<ClaySurface> {
       height: widget.height,
       margin: widget.margin,
       transform: Matrix4.identity()
-        ..translate(0.0, lifted ? -8.0 : 0.0)
-        ..scale(_pressed ? 0.98 : 1.0),
+        ..translate(0.0, lifted ? -2.0 : 0.0)
+        ..scale(_pressed ? 0.99 : 1.0),
       decoration: ClayDecorations.surface(
         depth: depth,
-        color: widget.glass ? ClayTokens.cardGlass : widget.color,
+        color: widget.color ?? ClayTokens.cardBg,
         radius: widget.radius,
         gradient: widget.gradient,
         glass: widget.glass,
         border: widget.borderless
             ? null
             : Border.all(
-                color: ClayTokens.highlight.withValues(alpha: widget.glass ? 0.75 : 0.65),
-                width: 1.5,
+                color: ClayTokens.divider,
+                width: 1,
               ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.radius),
-        child: widget.glass
-            ? BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Padding(padding: widget.padding ?? EdgeInsets.zero, child: widget.child),
-              )
-            : Padding(padding: widget.padding ?? EdgeInsets.zero, child: widget.child),
+        child: Padding(padding: widget.padding ?? EdgeInsets.zero, child: widget.child),
       ),
     );
 
@@ -95,7 +88,7 @@ class _ClaySurfaceState extends State<ClaySurface> {
             onTapCancel: () => setState(() => _pressed = false),
             borderRadius: BorderRadius.circular(widget.radius),
             splashColor: ClayTokens.accent.withValues(alpha: 0.08),
-            highlightColor: ClayTokens.accent.withValues(alpha: 0.04),
+            highlightColor: ClayTokens.accentSurface.withValues(alpha: 0.5),
             child: content,
           ),
         ),

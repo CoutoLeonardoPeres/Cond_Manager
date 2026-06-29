@@ -31,8 +31,8 @@ class TicketStatusChip extends StatelessWidget {
   static (Color, Color) _colors(TicketStatus status) => switch (status) {
         TicketStatus.open => (ClayTokens.accent, ClayTokens.accent.withValues(alpha: 0.12)),
         TicketStatus.inAnalysis => (
-            const Color(0xFF7C3AED),
-            const Color(0xFF7C3AED).withValues(alpha: 0.12),
+            ClayTokens.accent,
+            ClayTokens.accent.withValues(alpha: 0.12),
           ),
         TicketStatus.waitingMaterial => (
             ClayTokens.warning,

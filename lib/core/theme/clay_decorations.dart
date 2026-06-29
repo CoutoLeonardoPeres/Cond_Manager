@@ -1,86 +1,48 @@
-import 'dart:ui';
-
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:flutter/material.dart';
 
 enum ClayDepth { flat, raised, floating, pressed, card, button }
 
 abstract final class ClayDecorations {
-  /// Deep clay — large containers / hero sections.
-  static List<BoxShadow> deepClayShadows() => [
-        BoxShadow(
-          color: ClayTokens.shadowAmbient.withValues(alpha: 1),
-          offset: const Offset(30, 30),
-          blurRadius: 60,
-        ),
-        BoxShadow(
-          color: ClayTokens.highlight.withValues(alpha: 1),
-          offset: const Offset(-30, -30),
-          blurRadius: 60,
-        ),
-      ];
+  /// Soft ambient shadow for large containers.
+  static List<BoxShadow> deepClayShadows() => softShadows(blur: 32, offsetY: 8);
 
-  /// Clay Card — 4-layer floating stack.
-  static List<BoxShadow> clayCardShadows({bool hover = false}) => [
-        BoxShadow(
-          color: ClayTokens.shadowCard.withValues(alpha: hover ? 0.28 : 0.2),
-          offset: Offset(16, hover ? 20 : 16),
-          blurRadius: hover ? 40 : 32,
-        ),
-        BoxShadow(
-          color: ClayTokens.highlight.withValues(alpha: 0.9),
-          offset: const Offset(-10, -10),
-          blurRadius: 24,
-        ),
-        BoxShadow(
-          color: ClayTokens.shadowPurple.withValues(alpha: 0.03),
-          offset: const Offset(6, 6),
-          blurRadius: 12,
-        ),
-        BoxShadow(
-          color: ClayTokens.highlight.withValues(alpha: 0.5),
-          offset: const Offset(-2, -2),
-          blurRadius: 8,
-        ),
-      ];
+  /// Card shadow — high blur, low opacity (~0.05).
+  static List<BoxShadow> clayCardShadows({bool hover = false}) => softShadows(
+        blur: hover ? 28 : 24,
+        offsetY: hover ? 6 : 4,
+        opacity: hover ? 0.08 : 0.05,
+      );
 
-  /// Clay Button — high convexity.
-  static List<BoxShadow> clayButtonShadows({bool hover = false}) => [
-        BoxShadow(
-          color: ClayTokens.shadowPurple.withValues(alpha: hover ? 0.38 : 0.3),
-          offset: Offset(12, hover ? 16 : 12),
-          blurRadius: hover ? 28 : 24,
-        ),
-        BoxShadow(
-          color: ClayTokens.highlight.withValues(alpha: 0.4),
-          offset: const Offset(-8, -8),
-          blurRadius: 16,
-        ),
-        BoxShadow(
-          color: ClayTokens.highlight.withValues(alpha: 0.4),
-          offset: const Offset(4, 4),
-          blurRadius: 8,
-        ),
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.1),
-          offset: const Offset(-4, -4),
-          blurRadius: 8,
-        ),
-      ];
+  /// Button shadow — slightly more pronounced.
+  static List<BoxShadow> clayButtonShadows({bool hover = false}) => softShadows(
+        blur: hover ? 20 : 16,
+        offsetY: hover ? 4 : 3,
+        opacity: hover ? 0.12 : 0.08,
+      );
 
-  /// Clay Pressed — recessed inputs & active buttons.
+  /// Pressed / inset feel for inputs.
   static List<BoxShadow> clayPressedShadows() => [
         BoxShadow(
-          color: ClayTokens.shadowDark,
-          offset: const Offset(5, 5),
-          blurRadius: 12,
-          spreadRadius: -2,
+          color: ClayTokens.shadowDark.withValues(alpha: 0.04),
+          offset: const Offset(0, 1),
+          blurRadius: 4,
+          spreadRadius: 0,
         ),
+      ];
+
+  static List<BoxShadow> softShadows({
+    double blur = 24,
+    double offsetY = 4,
+    double opacity = 0.05,
+    Color? color,
+  }) =>
+      [
         BoxShadow(
-          color: ClayTokens.highlight,
-          offset: const Offset(-5, -5),
-          blurRadius: 12,
-          spreadRadius: -2,
+          color: (color ?? ClayTokens.shadowCard).withValues(alpha: opacity),
+          offset: Offset(0, offsetY),
+          blurRadius: blur,
+          spreadRadius: 0,
         ),
       ];
 
@@ -103,15 +65,17 @@ abstract final class ClayDecorations {
       gradient: gradient,
       borderRadius: BorderRadius.circular(radius),
       border: border ??
-          Border.all(
-            color: ClayTokens.highlight.withValues(alpha: glass ? 0.7 : 0.65),
-            width: 1.5,
-          ),
+          (depth == ClayDepth.flat
+              ? null
+              : Border.all(
+                  color: ClayTokens.divider.withValues(alpha: 0.8),
+                  width: 1,
+                )),
       boxShadow: switch (depth) {
         ClayDepth.flat => null,
         ClayDepth.raised => clayCardShadows(),
         ClayDepth.floating => clayCardShadows(hover: true),
-        ClayDepth.pressed => clayPressedShadows(),
+        ClayDepth.pressed => null,
         ClayDepth.card => clayCardShadows(),
         ClayDepth.button => clayButtonShadows(),
       },
@@ -122,22 +86,15 @@ abstract final class ClayDecorations {
     return BoxDecoration(
       gradient: ClayTokens.primaryGradient,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: Colors.white.withValues(alpha: 0.35),
-        width: 1.2,
-      ),
       boxShadow: clayButtonShadows(),
     );
   }
 
   static BoxDecoration glassOverlay({double radius = ClayTokens.radiusCard}) {
     return BoxDecoration(
-      color: ClayTokens.cardGlass,
+      color: ClayTokens.cardBg,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: Colors.white.withValues(alpha: 0.6),
-        width: 1.5,
-      ),
+      border: Border.all(color: ClayTokens.divider, width: 1),
       boxShadow: clayCardShadows(),
     );
   }
@@ -149,10 +106,7 @@ abstract final class ClayDecorations {
   }) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: child,
-      ),
+      child: child,
     );
   }
 }

@@ -27,8 +27,8 @@ class WorkOrderStatusChip extends StatelessWidget {
   static (Color, Color) _colors(WorkOrderStatus status) => switch (status) {
         WorkOrderStatus.open => (ClayTokens.accent, ClayTokens.accent.withValues(alpha: 0.12)),
         WorkOrderStatus.triage => (
-            const Color(0xFF7C3AED),
-            const Color(0xFF7C3AED).withValues(alpha: 0.12),
+            ClayTokens.accent,
+            ClayTokens.accent.withValues(alpha: 0.12),
           ),
         WorkOrderStatus.inProgress => (
             ClayTokens.tertiary,

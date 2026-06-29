@@ -7,12 +7,12 @@ class ClayCard extends StatelessWidget {
   const ClayCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(24),
+    this.padding = const EdgeInsets.all(22),
     this.onTap,
     this.depth = ClayDepth.card,
     this.accentColor,
     this.backgroundColor,
-    this.glass = true,
+    this.glass = false,
     this.liftOnHover = true,
     this.radius = ClayTokens.radiusCard,
   });
@@ -34,15 +34,15 @@ class ClayCard extends StatelessWidget {
       radius: radius,
       padding: padding,
       onTap: onTap,
-      color: backgroundColor,
-      glass: backgroundColor == null && glass,
+      color: backgroundColor ?? ClayTokens.cardBg,
+      glass: glass,
       liftOnHover: liftOnHover && onTap != null,
       child: child,
     );
   }
 }
 
-class ClayStatCard extends StatefulWidget {
+class ClayStatCard extends StatelessWidget {
   const ClayStatCard({
     super.key,
     required this.title,
@@ -61,61 +61,36 @@ class ClayStatCard extends StatefulWidget {
   final int gradientIndex;
 
   @override
-  State<ClayStatCard> createState() => _ClayStatCardState();
-}
-
-class _ClayStatCardState extends State<ClayStatCard> with SingleTickerProviderStateMixin {
-  late final AnimationController _breathe;
-
-  @override
-  void initState() {
-    super.initState();
-    _breathe = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _breathe.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.of(context).disableAnimations;
-    final gradient = ClayTokens.iconGradientAt(widget.gradientIndex);
-
     return ClayCard(
-      onTap: widget.onTap,
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          reduceMotion
-              ? _iconOrb(gradient)
-              : AnimatedBuilder(
-                  animation: _breathe,
-                  builder: (context, child) {
-                    final scale = 1.0 + (_breathe.value * 0.02);
-                    return Transform.scale(scale: scale, child: child);
-                  },
-                  child: _iconOrb(gradient),
-                ),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: ClayTokens.accentSurface,
+              borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+            ),
+            child: Icon(icon, color: ClayTokens.accent, size: 24),
+          ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.value,
+                value,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -0.5,
+                      color: ClayTokens.foreground,
                     ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
-                widget.title,
+                title,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: ClayTokens.muted,
                       fontWeight: FontWeight.w500,
@@ -125,19 +100,6 @@ class _ClayStatCardState extends State<ClayStatCard> with SingleTickerProviderSt
           ),
         ],
       ),
-    );
-  }
-
-  Widget _iconOrb(Gradient gradient) {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
-        boxShadow: ClayDecorations.clayButtonShadows(),
-      ),
-      child: Icon(widget.icon, color: Colors.white, size: 26),
     );
   }
 }
@@ -151,6 +113,9 @@ class ClayListTileCard extends StatelessWidget {
     this.iconColor = ClayTokens.accent,
     this.gradientIndex = 0,
     this.onTap,
+    this.trailing,
+    this.showDivider = true,
+    this.avatarLabel,
   });
 
   final IconData icon;
@@ -159,49 +124,102 @@ class ClayListTileCard extends StatelessWidget {
   final Color iconColor;
   final int gradientIndex;
   final VoidCallback? onTap;
+  final Widget? trailing;
+  final bool showDivider;
+  final String? avatarLabel;
 
   @override
   Widget build(BuildContext context) {
-    final gradient = ClayTokens.iconGradientAt(gradientIndex);
+    final row = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: ClayTokens.accentSurface,
+                child: avatarLabel != null
+                    ? Text(
+                        avatarLabel!,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: ClayTokens.accent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      )
+                    : Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: ClayTokens.foreground,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: ClayTokens.muted,
+                            height: 1.4,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              trailing ??
+                  Icon(
+                    Icons.more_vert_rounded,
+                    color: ClayTokens.textMuted,
+                    size: 20,
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
 
+    if (!showDivider) return row;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        row,
+        const Divider(height: 1, thickness: 1, indent: 76),
+      ],
+    );
+  }
+}
+
+/// Card container for grouped list rows (tickets, chamados, etc.).
+class ClayListCard extends StatelessWidget {
+  const ClayListCard({
+    super.key,
+    required this.children,
+    this.padding = EdgeInsets.zero,
+  });
+
+  final List<Widget> children;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
     return ClayCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(18),
-      child: Row(
+      padding: padding,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: gradient,
-              borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
-              boxShadow: ClayDecorations.clayButtonShadows(),
-            ),
-            child: Icon(icon, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: ClayTokens.muted,
-                        height: 1.4,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right_rounded, color: ClayTokens.muted.withValues(alpha: 0.7)),
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const Divider(height: 1, thickness: 1),
+            children[i],
+          ],
         ],
       ),
     );

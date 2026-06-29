@@ -13,10 +13,11 @@ class AppTheme {
     final colorScheme = ColorScheme.light(
       primary: ClayTokens.accent,
       onPrimary: ClayTokens.textOnPrimary,
-      secondary: ClayTokens.tertiary,
+      secondary: ClayTokens.accentAlt,
       onSecondary: ClayTokens.foreground,
       surface: ClayTokens.surfaceRaised,
       onSurface: ClayTokens.foreground,
+      surfaceContainerHighest: ClayTokens.cardMint,
       error: ClayTokens.error,
       onError: ClayTokens.textOnPrimary,
     );
@@ -35,13 +36,13 @@ class AppTheme {
         centerTitle: false,
         titleTextStyle: AppTypography.heading(
           fontSize: 20,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           color: ClayTokens.foreground,
         ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: ClayTokens.cardGlass,
+        color: ClayTokens.cardBg,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ClayTokens.radiusCard),
@@ -51,39 +52,39 @@ class AppTheme {
         filled: true,
         fillColor: ClayTokens.inputBg,
         labelStyle: AppTypography.body(
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
           color: ClayTokens.muted,
         ),
-        hintStyle: AppTypography.body(color: ClayTokens.muted),
+        hintStyle: AppTypography.body(color: ClayTokens.textMuted),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(ClayTokens.radiusFull),
+          borderSide: BorderSide(color: ClayTokens.divider, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(ClayTokens.radiusFull),
+          borderSide: BorderSide(color: ClayTokens.divider, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
-          borderSide: BorderSide(color: ClayTokens.accent.withValues(alpha: 0.4), width: 2),
+          borderRadius: BorderRadius.circular(ClayTokens.radiusFull),
+          borderSide: const BorderSide(color: ClayTokens.accent, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
+          borderRadius: BorderRadius.circular(ClayTokens.radiusFull),
           borderSide: const BorderSide(color: ClayTokens.error, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          backgroundColor: Colors.transparent,
+          backgroundColor: ClayTokens.accent,
           shadowColor: Colors.transparent,
           foregroundColor: ClayTokens.textOnPrimary,
-          minimumSize: const Size(double.infinity, 56),
+          minimumSize: const Size(double.infinity, 48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
           ),
-          textStyle: AppTypography.body(fontWeight: FontWeight.w700, fontSize: 15),
+          textStyle: AppTypography.body(fontWeight: FontWeight.w600, fontSize: 15),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -94,41 +95,42 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
-        height: 80,
-        backgroundColor: Colors.transparent,
-        indicatorColor: ClayTokens.accent.withValues(alpha: 0.15),
+        height: 72,
+        backgroundColor: ClayTokens.sidebar,
+        indicatorColor: ClayTokens.sidebarActive.withValues(alpha: 0.15),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.dmSans(
+          return GoogleFonts.inter(
             fontSize: 11,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected ? ClayTokens.accent : ClayTokens.muted,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? ClayTokens.accent : ClayTokens.sidebarMuted,
           );
         }),
       ),
       navigationRailTheme: NavigationRailThemeData(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        selectedIconTheme: const IconThemeData(color: ClayTokens.accent, size: 26),
-        unselectedIconTheme: IconThemeData(color: ClayTokens.muted.withValues(alpha: 0.9)),
-        selectedLabelTextStyle: GoogleFonts.dmSans(
+        backgroundColor: ClayTokens.sidebar,
+        selectedIconTheme: const IconThemeData(color: ClayTokens.accent, size: 24),
+        unselectedIconTheme: const IconThemeData(color: ClayTokens.sidebarMuted, size: 24),
+        selectedLabelTextStyle: GoogleFonts.inter(
           color: ClayTokens.accent,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           fontSize: 12,
         ),
-        unselectedLabelTextStyle: GoogleFonts.dmSans(
-          color: ClayTokens.muted,
+        unselectedLabelTextStyle: GoogleFonts.inter(
+          color: ClayTokens.sidebarMuted,
           fontWeight: FontWeight.w500,
           fontSize: 11,
         ),
       ),
-      dividerTheme: DividerThemeData(
-        color: ClayTokens.shadowDark.withValues(alpha: 0.35),
+      dividerTheme: const DividerThemeData(
+        color: ClayTokens.divider,
         thickness: 1,
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(color: ClayTokens.accent),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        backgroundColor: ClayTokens.foreground,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
         ),
@@ -136,7 +138,7 @@ class AppTheme {
       menuTheme: MenuThemeData(
         style: MenuStyle(
           backgroundColor: const WidgetStatePropertyAll(ClayTokens.surfaceRaised),
-          elevation: const WidgetStatePropertyAll(12),
+          elevation: const WidgetStatePropertyAll(8),
           padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 8)),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
@@ -148,13 +150,19 @@ class AppTheme {
       dropdownMenuTheme: DropdownMenuThemeData(
         menuStyle: MenuStyle(
           backgroundColor: const WidgetStatePropertyAll(ClayTokens.surfaceRaised),
-          elevation: const WidgetStatePropertyAll(12),
+          elevation: const WidgetStatePropertyAll(8),
           padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 8)),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
             ),
           ),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
         ),
       ),
     );

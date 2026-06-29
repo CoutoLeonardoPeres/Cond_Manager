@@ -18,6 +18,7 @@ class ClayTextField extends StatefulWidget {
     this.maxLines = 1,
     this.readOnly = false,
     this.inputFormatters,
+    this.pill = true,
   });
 
   final TextEditingController? controller;
@@ -32,6 +33,7 @@ class ClayTextField extends StatefulWidget {
   final int maxLines;
   final bool readOnly;
   final List<TextInputFormatter>? inputFormatters;
+  final bool pill;
 
   @override
   State<ClayTextField> createState() => _ClayTextFieldState();
@@ -55,6 +57,8 @@ class _ClayTextFieldState extends State<ClayTextField> {
 
   @override
   Widget build(BuildContext context) {
+    final radius = widget.pill ? ClayTokens.radiusFull : ClayTokens.radiusButton;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -62,7 +66,7 @@ class _ClayTextFieldState extends State<ClayTextField> {
           Text(
             widget.label!,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                   color: ClayTokens.muted,
                 ),
           ),
@@ -71,12 +75,15 @@ class _ClayTextFieldState extends State<ClayTextField> {
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: _focused ? ClayTokens.surfaceRaised : ClayTokens.inputBg,
-            borderRadius: BorderRadius.circular(ClayTokens.radiusButton),
-            boxShadow: _focused ? ClayDecorations.clayCardShadows() : ClayDecorations.clayPressedShadows(),
-            border: _focused
-                ? Border.all(color: ClayTokens.accent.withValues(alpha: 0.25), width: 2)
-                : null,
+            color: ClayTokens.inputBg,
+            borderRadius: BorderRadius.circular(radius),
+            boxShadow: _focused ? ClayDecorations.clayCardShadows() : null,
+            border: Border.all(
+              color: _focused
+                  ? ClayTokens.accent
+                  : ClayTokens.divider,
+              width: _focused ? 2 : 1,
+            ),
           ),
           child: TextFormField(
             controller: widget.controller,
@@ -94,7 +101,7 @@ class _ClayTextFieldState extends State<ClayTextField> {
                 ),
             decoration: InputDecoration(
               hintText: widget.hint,
-              hintStyle: TextStyle(color: ClayTokens.muted.withValues(alpha: 0.85)),
+              hintStyle: TextStyle(color: ClayTokens.textMuted),
               prefixIcon: widget.prefixIcon,
               suffixIcon: widget.suffixIcon,
               border: InputBorder.none,
@@ -102,7 +109,7 @@ class _ClayTextFieldState extends State<ClayTextField> {
               focusedBorder: InputBorder.none,
               errorBorder: InputBorder.none,
               filled: false,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             ),
           ),
         ),

@@ -1,7 +1,6 @@
 import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/clay_decorations.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
-import 'package:cond_manager/shared/widgets/clay/clay_surface.dart';
 import 'package:flutter/material.dart';
 
 class ClayNavRail extends StatelessWidget {
@@ -10,30 +9,47 @@ class ClayNavRail extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.onSelected,
+    this.slim = true,
   });
 
   final List<ClayNavItem> items;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+  final bool slim;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
-      child: ClaySurface(
-        radius: ClayTokens.radiusXl,
-        depth: ClayDepth.floating,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        child: ListView.separated(
-          padding: EdgeInsets.zero,
-          itemCount: items.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 4),
-          itemBuilder: (context, i) => _ClayNavTile(
-            item: items[i],
-            selected: i == selectedIndex,
-            onTap: () => onSelected(i),
+    return Container(
+      width: slim ? 72 : 240,
+      color: ClayTokens.sidebar,
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: ClayTokens.primaryGradient,
+              borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+            ),
+            child: const Icon(Icons.apartment_rounded, color: Colors.white, size: 22),
           ),
-        ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, i) => _ClayNavTile(
+                item: items[i],
+                selected: i == selectedIndex,
+                onTap: () => onSelected(i),
+                slim: slim,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }
@@ -53,25 +69,29 @@ class ClayBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: ClaySurface(
-        radius: ClayTokens.radiusXl,
-        depth: ClayDepth.floating,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            for (var i = 0; i < items.length; i++)
-              Expanded(
-                child: _ClayNavTile(
-                  item: items[i],
-                  selected: i == selectedIndex,
-                  onTap: () => onSelected(i),
-                  compact: true,
+    return Container(
+      decoration: BoxDecoration(
+        color: ClayTokens.sidebar,
+        boxShadow: ClayDecorations.softShadows(blur: 16, offsetY: -2, opacity: 0.1),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              for (var i = 0; i < items.length; i++)
+                Expanded(
+                  child: _ClayNavTile(
+                    item: items[i],
+                    selected: i == selectedIndex,
+                    onTap: () => onSelected(i),
+                    compact: true,
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -90,81 +110,94 @@ class _ClayNavTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.compact = false,
+    this.slim = false,
   });
 
   final ClayNavItem item;
   final bool selected;
   final VoidCallback onTap;
   final bool compact;
+  final bool slim;
 
   @override
   Widget build(BuildContext context) {
+    if (slim || compact) {
+      return _buildIconTile();
+    }
+    return _buildLabeledTile();
+  }
+
+  Widget _buildIconTile() {
+    return Tooltip(
+      message: item.label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            height: 48,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 44,
+                height: 44,
+                decoration: selected
+                    ? BoxDecoration(
+                        color: ClayTokens.sidebarActive,
+                        shape: BoxShape.circle,
+                        boxShadow: ClayDecorations.softShadows(blur: 12, opacity: 0.15),
+                      )
+                    : null,
+                child: Icon(
+                  item.icon,
+                  size: 22,
+                  color: selected ? ClayTokens.accent : ClayTokens.sidebarMuted,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabeledTile() {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
+        borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 4 : 14,
-            vertical: compact ? 10 : 12,
-          ),
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: selected
               ? BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      ClayTokens.accent.withValues(alpha: 0.2),
-                      ClayTokens.accent.withValues(alpha: 0.08),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
-                  boxShadow: ClayDecorations.clayPressedShadows(),
+                  color: ClayTokens.accentSurface.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                  border: Border.all(color: ClayTokens.accent.withValues(alpha: 0.4), width: 1.5),
                 )
               : null,
-          child: compact
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      item.icon,
-                      size: 22,
-                      color: selected ? ClayTokens.accent : ClayTokens.muted,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.label.split(' ').first,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.body(
-                        fontSize: 10,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                        color: selected ? ClayTokens.accent : ClayTokens.muted,
-                      ),
-                    ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    Icon(
-                      item.icon,
-                      size: 22,
-                      color: selected ? ClayTokens.accent : ClayTokens.muted,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        item.label,
-                        style: AppTypography.body(
-                          fontSize: 13,
-                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                          color: selected ? ClayTokens.accent : ClayTokens.muted,
-                        ),
-                      ),
-                    ),
-                  ],
+          child: Row(
+            children: [
+              Icon(
+                item.icon,
+                size: 22,
+                color: selected ? ClayTokens.accent : ClayTokens.sidebarMuted,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.label,
+                  style: AppTypography.body(
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: selected ? ClayTokens.sidebarActive : ClayTokens.textOnSidebar,
+                  ),
                 ),
+              ),
+            ],
+          ),
         ),
       ),
     );
