@@ -39,7 +39,7 @@ class RentalCalendarPage extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Visualize a ocupação por imóvel. Escolha dia, semana, mês ou ano e navegue pelo período.',
+                'Visualize a ocupação por imóvel. No modo mês, exibe o mês atual e o próximo — deslize pela barra inferior para navegar.',
                 style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 12),
@@ -99,8 +99,9 @@ class RentalCalendarPage extends ConsumerWidget {
                     label: 'Hoje',
                     expand: false,
                     onPressed: () {
+                      final now = rentalGanttDateOnly(DateTime.now());
                       ref.read(rentalOccupancyAnchorProvider.notifier).state =
-                          rentalGanttDateOnly(DateTime.now());
+                          DateTime(now.year, now.month, 1);
                     },
                   ),
                   const SizedBox(width: 4),

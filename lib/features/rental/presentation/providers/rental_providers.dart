@@ -64,7 +64,10 @@ final rentalOccupancyViewModeProvider = StateProvider<RentalOccupancyViewMode>(
 );
 
 final rentalOccupancyAnchorProvider = StateProvider<DateTime>(
-  (ref) => rentalGanttDateOnly(DateTime.now()),
+  (ref) {
+    final now = rentalGanttDateOnly(DateTime.now());
+    return DateTime(now.year, now.month, 1);
+  },
 );
 
 final rentalOccupancyRangeProvider = Provider<RentalGanttRange>((ref) {

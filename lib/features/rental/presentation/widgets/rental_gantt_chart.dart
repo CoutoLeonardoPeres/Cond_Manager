@@ -139,7 +139,9 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
     }
 
     final viewport = _bodyHController.position.viewportDimension;
-    final target = (targetIndex * colWidth) - (viewport / 2) + (colWidth / 2);
+    final target = widget.viewMode == RentalOccupancyViewMode.month
+        ? targetIndex * colWidth
+        : (targetIndex * colWidth) - (viewport / 2) + (colWidth / 2);
     final offset = target.clamp(0.0, _bodyHController.position.maxScrollExtent);
     _bodyHController.jumpTo(offset);
     _headerHController.jumpTo(offset);
@@ -177,6 +179,10 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
         final properties = rentalGanttSortedProperties(widget.properties);
         final bodyHeight = properties.length * widget.rowHeight;
         final todayLeft = _todayMarkerLeft(widget.viewMode, colWidth, colCount);
+        final timelineViewportWidth =
+            (constraints.maxWidth - widget.propertyColumnWidth).clamp(0.0, double.infinity);
+        final showHorizontalBar = widget.viewMode != RentalOccupancyViewMode.day &&
+            timelineWidth > timelineViewportWidth + 1;
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToToday(colWidth, colCount);
@@ -201,9 +207,7 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
                         scrollDirection: Axis.horizontal,
                         physics: widget.viewMode == RentalOccupancyViewMode.day
                             ? const NeverScrollableScrollPhysics()
-                            : const BouncingScrollPhysics(
-                                parent: AlwaysScrollableScrollPhysics(),
-                              ),
+                            : const ClampingScrollPhysics(),
                         child: _OccupancyHeader(
                           range: widget.range,
                           viewMode: widget.viewMode,
@@ -241,97 +245,101 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
                   ),
                   Expanded(
                     child: Scrollbar(
-                      controller: _bodyHController,
-                      thumbVisibility: widget.viewMode != RentalOccupancyViewMode.day,
-                      notificationPredicate: (n) => n.metrics.axis == Axis.horizontal,
-                      child: Scrollbar(
-                        controller: _bodyVController,
-                        thumbVisibility: true,
-                        notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
-                        child: LayoutBuilder(
-                          builder: (context, bodyConstraints) {
-                            return SingleChildScrollView(
-                              controller: _bodyHController,
-                              scrollDirection: Axis.horizontal,
-                              physics: widget.viewMode == RentalOccupancyViewMode.day
-                                  ? const NeverScrollableScrollPhysics()
-                                  : const BouncingScrollPhysics(
-                                      parent: AlwaysScrollableScrollPhysics(),
-                                    ),
-                              dragStartBehavior: DragStartBehavior.down,
-                              child: SizedBox(
-                                width: timelineWidth,
-                                height: bodyConstraints.maxHeight,
-                                child: SingleChildScrollView(
-                                  controller: _bodyVController,
-                                  physics: const ClampingScrollPhysics(),
-                                  child: SizedBox(
-                                    height: bodyHeight,
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      children: [
-                                        _OccupancyGrid(
-                                          range: widget.range,
-                                          viewMode: widget.viewMode,
-                                          colWidth: colWidth,
-                                          colCount: colCount,
-                                          rowHeight: widget.rowHeight,
-                                          rowCount: properties.length,
-                                          properties: properties,
-                                          borderColor: _borderColor,
-                                          onCellTap: widget.onCellTap,
-                                        ),
-                                        if (todayLeft != null)
-                                          Positioned(
-                                            left: todayLeft,
-                                            top: 0,
-                                            bottom: 0,
-                                            child: IgnorePointer(
-                                              child: Container(
-                                                width: 2,
-                                                color: ClayTokens.primary.withValues(alpha: 0.55),
-                                              ),
+                      controller: _bodyVController,
+                      thumbVisibility: true,
+                      notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
+                      child: LayoutBuilder(
+                        builder: (context, bodyConstraints) {
+                          return SingleChildScrollView(
+                            controller: _bodyHController,
+                            scrollDirection: Axis.horizontal,
+                            physics: widget.viewMode == RentalOccupancyViewMode.day
+                                ? const NeverScrollableScrollPhysics()
+                                : const ClampingScrollPhysics(),
+                            dragStartBehavior: DragStartBehavior.down,
+                            child: SizedBox(
+                              width: timelineWidth,
+                              height: bodyConstraints.maxHeight,
+                              child: SingleChildScrollView(
+                                controller: _bodyVController,
+                                physics: const ClampingScrollPhysics(),
+                                child: SizedBox(
+                                  height: bodyHeight,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      _OccupancyGrid(
+                                        range: widget.range,
+                                        viewMode: widget.viewMode,
+                                        colWidth: colWidth,
+                                        colCount: colCount,
+                                        rowHeight: widget.rowHeight,
+                                        rowCount: properties.length,
+                                        properties: properties,
+                                        borderColor: _borderColor,
+                                        onCellTap: widget.onCellTap,
+                                      ),
+                                      if (todayLeft != null)
+                                        Positioned(
+                                          left: todayLeft,
+                                          top: 0,
+                                          bottom: 0,
+                                          child: IgnorePointer(
+                                            child: Container(
+                                              width: 2,
+                                              color: ClayTokens.primary.withValues(alpha: 0.55),
                                             ),
                                           ),
-                                        ...List.generate(properties.length, (row) {
-                                          final property = properties[row];
-                                          final segments = rentalGanttSegmentsForProperty(
-                                            propertyId: property.id,
-                                            bookings: widget.bookings,
-                                            leases: widget.leases,
+                                        ),
+                                      ...List.generate(properties.length, (row) {
+                                        final property = properties[row];
+                                        final segments = rentalGanttSegmentsForProperty(
+                                          propertyId: property.id,
+                                          bookings: widget.bookings,
+                                          leases: widget.leases,
+                                          range: widget.range,
+                                        );
+                                        return Positioned(
+                                          top: row * widget.rowHeight,
+                                          left: 0,
+                                          width: timelineWidth,
+                                          height: widget.rowHeight,
+                                          child: _PropertyTimelineRow(
                                             range: widget.range,
-                                          );
-                                          return Positioned(
-                                            top: row * widget.rowHeight,
-                                            left: 0,
-                                            width: timelineWidth,
-                                            height: widget.rowHeight,
-                                            child: _PropertyTimelineRow(
-                                              range: widget.range,
-                                              viewMode: widget.viewMode,
-                                              segments: segments,
-                                              colWidth: colWidth,
-                                              colCount: colCount,
-                                              rowHeight: widget.rowHeight,
-                                              stripe: row.isOdd,
-                                              onSegmentTap: widget.onSegmentTap,
-                                            ),
-                                          );
-                                        }),
-                                      ],
-                                    ),
+                                            viewMode: widget.viewMode,
+                                            segments: segments,
+                                            colWidth: colWidth,
+                                            colCount: colCount,
+                                            rowHeight: widget.rowHeight,
+                                            stripe: row.isOdd,
+                                            onSegmentTap: widget.onSegmentTap,
+                                          ),
+                                        );
+                                      }),
+                                    ],
                                   ),
                                 ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+            if (showHorizontalBar) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: EdgeInsets.only(left: widget.propertyColumnWidth),
+                child: _GanttHorizontalScrollbar(
+                  controller: _bodyHController,
+                  contentWidth: timelineWidth,
+                  viewportWidth: timelineViewportWidth,
+                ),
+              ),
+            ],
           ],
         );
       },
@@ -432,7 +440,11 @@ class _OccupancyHeader extends StatelessWidget {
               maxLines: viewMode == RentalOccupancyViewMode.day ? 2 : 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: viewMode == RentalOccupancyViewMode.day ? 12 : 10,
+                fontSize: viewMode == RentalOccupancyViewMode.day
+                    ? 12
+                    : colWidth < 24
+                        ? 9
+                        : 10,
                 fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
                 color: highlight
                     ? ClayTokens.primary
@@ -799,5 +811,117 @@ class _PropertyTimelineRow extends StatelessWidget {
       return (cols.$2 - cols.$1) * colWidth - 2;
     }
     return segment.end.difference(segment.start).inDays * colWidth - 2;
+  }
+}
+
+/// Barra horizontal fixa no rodapé do Gantt — desliza os meses para a esquerda/direita.
+class _GanttHorizontalScrollbar extends StatefulWidget {
+  const _GanttHorizontalScrollbar({
+    required this.controller,
+    required this.contentWidth,
+    required this.viewportWidth,
+  });
+
+  final ScrollController controller;
+  final double contentWidth;
+  final double viewportWidth;
+
+  @override
+  State<_GanttHorizontalScrollbar> createState() => _GanttHorizontalScrollbarState();
+}
+
+class _GanttHorizontalScrollbarState extends State<_GanttHorizontalScrollbar> {
+  static const _trackHeight = 14.0;
+  static const _minThumbWidth = 40.0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(covariant _GanttHorizontalScrollbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onScroll);
+      widget.controller.addListener(_onScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() => setState(() {});
+
+  void _jumpToThumbCenter(double localX, double trackWidth, double thumbWidth, double maxScroll) {
+    if (!widget.controller.hasClients || maxScroll <= 0) return;
+    final usable = trackWidth - thumbWidth;
+    if (usable <= 0) return;
+    final target = ((localX - thumbWidth / 2) / usable * maxScroll).clamp(0.0, maxScroll);
+    widget.controller.jumpTo(target);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxScroll = widget.controller.hasClients ? widget.controller.position.maxScrollExtent : 0.0;
+    final offset = widget.controller.hasClients ? widget.controller.offset : 0.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final trackWidth = constraints.maxWidth;
+        final thumbWidth = (widget.viewportWidth / widget.contentWidth * trackWidth)
+            .clamp(_minThumbWidth, trackWidth);
+        final usable = (trackWidth - thumbWidth).clamp(0.0, trackWidth);
+        final thumbLeft = maxScroll > 0 && usable > 0 ? (offset / maxScroll) * usable : 0.0;
+
+        return Semantics(
+          label: 'Rolagem horizontal do mapa de ocupação',
+          slider: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragUpdate: (details) {
+              if (!widget.controller.hasClients || maxScroll <= 0 || usable <= 0) return;
+              final delta = details.delta.dx / usable * maxScroll;
+              widget.controller.jumpTo((widget.controller.offset + delta).clamp(0.0, maxScroll));
+            },
+            onTapDown: (details) =>
+                _jumpToThumbCenter(details.localPosition.dx, trackWidth, thumbWidth, maxScroll),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.grab,
+              child: Container(
+                height: _trackHeight,
+                decoration: BoxDecoration(
+                  color: ClayTokens.shadowDark.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                  border: Border.all(color: ClayTokens.shadowDark.withValues(alpha: 0.2)),
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: thumbLeft,
+                      width: thumbWidth,
+                      top: 2,
+                      bottom: 2,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: ClayTokens.accent.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                          border: Border.all(color: ClayTokens.accent.withValues(alpha: 0.7)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

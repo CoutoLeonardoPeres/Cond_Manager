@@ -39,7 +39,7 @@ RentalGanttRange rentalOccupancyRangeFor(RentalOccupancyViewMode mode, DateTime 
       }(),
     RentalOccupancyViewMode.month => RentalGanttRange(
         start: DateTime(a.year, a.month, 1),
-        end: DateTime(a.year, a.month + 1, 1),
+        end: DateTime(a.year, a.month + 2, 1),
       ),
     RentalOccupancyViewMode.year => RentalGanttRange(
         start: DateTime(a.year, 1, 1),
@@ -66,7 +66,7 @@ double rentalOccupancyColumnWidth({
   return switch (mode) {
     RentalOccupancyViewMode.day => available,
     RentalOccupancyViewMode.week => (available / 7).clamp(56.0, 140.0),
-    RentalOccupancyViewMode.month => 30.0,
+    RentalOccupancyViewMode.month => 20.0,
     RentalOccupancyViewMode.year => (available / 12).clamp(52.0, 96.0),
   };
 }
@@ -103,8 +103,17 @@ String rentalOccupancyPeriodLabel(RentalOccupancyViewMode mode, DateTime anchor)
         return '${fmt.format(start)} ${start.year} – ${fmt.format(end)} ${end.year}';
       }(),
     RentalOccupancyViewMode.month => () {
-        final s = DateFormat('MMMM yyyy', 'pt_BR').format(a);
-        return s[0].toUpperCase() + s.substring(1);
+        final start = DateTime(a.year, a.month, 1);
+        final end = DateTime(a.year, a.month + 2, 1).subtract(const Duration(days: 1));
+        final fmt = DateFormat('MMMM', 'pt_BR');
+        final year = DateFormat('yyyy').format(a);
+        final startLabel = fmt.format(start);
+        final endLabel = fmt.format(end);
+        if (start.month == end.month) {
+          final s = DateFormat('MMMM yyyy', 'pt_BR').format(start);
+          return s[0].toUpperCase() + s.substring(1);
+        }
+        return '${startLabel[0].toUpperCase()}${startLabel.substring(1)} – ${endLabel[0].toUpperCase()}${endLabel.substring(1)} $year';
       }(),
     RentalOccupancyViewMode.year => DateFormat('yyyy').format(a),
   };
