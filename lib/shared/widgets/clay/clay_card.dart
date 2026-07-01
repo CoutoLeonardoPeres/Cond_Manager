@@ -72,7 +72,9 @@ class ClayStatCard extends StatelessWidget {
       padding: compact ? const EdgeInsets.all(8) : const EdgeInsets.all(22),
       radius: compact ? ClayTokens.radiusSm : ClayTokens.radiusCard,
       child: compact
-          ? Row(
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   width: iconBox,
@@ -83,33 +85,28 @@ class ClayStatCard extends StatelessWidget {
                   ),
                   child: Icon(icon, color: accentColor, size: iconSize),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        value,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          color: ClayTokens.foreground,
-                        ),
-                      ),
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 9,
-                          color: ClayTokens.muted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: ClayTokens.foreground,
+                  ),
+                ),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    height: 1.2,
+                    color: ClayTokens.muted,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],

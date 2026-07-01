@@ -46,8 +46,9 @@ class _FinancialPageState extends ConsumerState<FinancialPage>
               ),
               const SizedBox(height: 4),
               const Text(
-                'Controle de despesas, receitas, mão de obra, materiais, frete e impostos — '
-                'por condomínio e pela empresa gestora.',
+                'Despesas e receitas da manutenção — mão de obra, materiais, OS, '
+                'prestadores e custos da gestora. Receitas de aluguel e locação '
+                'ficam em Locação → Cobranças.',
                 style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 12),

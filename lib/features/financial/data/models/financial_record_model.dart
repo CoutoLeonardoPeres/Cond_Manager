@@ -47,6 +47,7 @@ class FinancialRecordModel {
     this.recurrenceDayOfMonth,
     this.recurrenceActive = true,
     this.allocationParentId,
+    this.rentalChargeId,
   });
 
   final String id;
@@ -88,6 +89,7 @@ class FinancialRecordModel {
   final int? recurrenceDayOfMonth;
   final bool recurrenceActive;
   final String? allocationParentId;
+  final String? rentalChargeId;
 
   static const selectQuery = '''
     *,
@@ -189,6 +191,7 @@ class FinancialRecordModel {
       recurrenceDayOfMonth: json['recurrence_day_of_month'] as int?,
       recurrenceActive: json['recurrence_active'] as bool? ?? true,
       allocationParentId: json['allocation_parent_id'] as String?,
+      rentalChargeId: json['rental_charge_id'] as String?,
     );
   }
 
@@ -242,6 +245,7 @@ class FinancialRecordModel {
         recurrenceDayOfMonth: recurrenceDayOfMonth,
         recurrenceActive: recurrenceActive,
         allocationParentId: allocationParentId,
+        rentalChargeId: rentalChargeId,
         createdAt: createdAt,
         updatedAt: updatedAt,
       );

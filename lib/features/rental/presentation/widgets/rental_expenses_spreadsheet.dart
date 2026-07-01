@@ -12,6 +12,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_expense_loca
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
 import 'package:cond_manager/features/rental/domain/utils/rental_expense_mapping.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_expense_attachments_editor.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_expense_draft_sheet.dart';
 import 'package:cond_manager/shared/domain/enums/condominium_bill_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_record_type.dart';
@@ -853,6 +854,25 @@ class RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpreads
                           ),
                         )
                       else ...[
+                        if (row.expenseId != null)
+                          IconButton(
+                            icon: Icon(
+                              Icons.receipt_long_rounded,
+                              size: context._sheetMetrics.actionIconSize,
+                            ),
+                            tooltip: 'NF / Recibo',
+                            onPressed: () => showRentalExpenseAttachmentsSheet(
+                              context: context,
+                              ref: ref,
+                              expenseId: row.expenseId!,
+                              expenseLabel: row.description,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(
+                              minWidth: context._sheetMetrics.actionBtn,
+                              minHeight: context._sheetMetrics.actionBtn,
+                            ),
+                          ),
                         IconButton(
                           icon: Icon(Icons.delete_outline_rounded, size: context._sheetMetrics.actionIconSize),
                           tooltip: 'Excluir despesa',
@@ -912,7 +932,7 @@ class RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpreads
           7: FixedColumnWidth(108),
           8: FixedColumnWidth(118),
           9: FixedColumnWidth(52),
-          10: FixedColumnWidth(146),
+          10: FixedColumnWidth(174),
         },
         children: [
           TableRow(

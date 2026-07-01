@@ -66,12 +66,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         return RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(dashboardStatsProvider);
-            ref.invalidate(dashboardFinancialMetricsProvider);
+            ref.invalidate(dashboardFinancialMetricsProvider(DashboardFinancialModule.maintenance));
             ref.invalidate(currentProfileProvider);
             ref.invalidate(accessibleCondominiumsProvider);
             await Future.wait([
               ref.read(dashboardStatsProvider.future),
-              ref.read(dashboardFinancialMetricsProvider.future),
+              ref.read(
+                dashboardFinancialMetricsProvider(DashboardFinancialModule.maintenance).future,
+              ),
             ]);
           },
           child: SingleChildScrollView(
@@ -196,7 +198,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Financeiro e manutenção',
+                  'Financeiro da manutenção',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -205,12 +207,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 const DashboardFinancialKpiSection(
                   compact: true,
                   pairOccupancyProfitability: true,
+                  module: DashboardFinancialModule.maintenance,
                 ),
                 const SizedBox(height: 8),
                 const DashboardChartsSection(
                   compact: true,
                   showHeader: false,
                   pairOccupancyProfitabilityCharts: true,
+                  module: DashboardFinancialModule.maintenance,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -307,14 +311,17 @@ class _StatsGrid extends StatelessWidget {
     ];
 
     if (compact) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < cards.length; i++) ...[
-            if (i > 0) const SizedBox(width: 6),
-            Expanded(child: cards[i]),
-          ],
-        ],
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          const columns = 2;
+          const spacing = 6.0;
+          final tileWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+          return Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: cards.map((card) => SizedBox(width: tileWidth, child: card)).toList(),
+          );
+        },
       );
     }
 

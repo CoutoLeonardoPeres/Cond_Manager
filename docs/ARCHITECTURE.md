@@ -156,6 +156,8 @@ Tabelas publicadas: `tickets`, `work_orders`, `notifications`, `work_order_appro
 - `Result<T>` para operações que podem falhar
 - Providers Riverpod por feature em `presentation/providers/`
 - Breakpoint mobile comum: `MediaQuery.sizeOf(context).width < 640`
+- Filtros multi-campo: `ResponsiveFilterLayout` + `MonthFilterBar` (`lib/shared/widgets/form/`)
+- Financeiro manutenção: `excludeRentalModule` omite `rental_expense_entry_type`, `allocation_parent_id` e `rental_charge_id`
 - Nunca expor `service_role` key no cliente
 
 ## Migrations

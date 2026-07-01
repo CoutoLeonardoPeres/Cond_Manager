@@ -25,6 +25,9 @@ class PriorityBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             priority.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,

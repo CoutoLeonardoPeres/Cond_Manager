@@ -188,7 +188,21 @@
     {
       "id": "financial",
       "path": "lib/features/financial",
-      "capabilities": ["financial records", "condominium and company scope", "categories", "work order link"]
+      "capabilities": [
+        "financial records",
+        "condominium and company scope",
+        "categories",
+        "work order link",
+        "maintenance-only filter excludeRentalModule",
+        "filter carousel on records and report tabs"
+      ],
+      "keyFiles": [
+        "presentation/pages/financial_records_tab.dart",
+        "presentation/pages/financial_condo_report_tab.dart",
+        "presentation/pages/financial_company_report_tab.dart",
+        "presentation/widgets/financial_list_filters_bar.dart",
+        "presentation/providers/financial_providers.dart"
+      ]
     },
     {
       "id": "rental",
@@ -277,7 +291,9 @@
     "filterCarousel": {
       "layoutWidget": "lib/shared/widgets/form/filter_carousel_layout.dart",
       "responsiveWidget": "lib/shared/widgets/form/responsive_filter_layout.dart",
-      "usedOn": ["rental properties", "leases", "bookings", "charges", "dashboard", "tickets", "work orders", "providers", "materials"]
+      "monthFilterWidget": "lib/shared/widgets/form/month_filter_bar.dart",
+      "financialFiltersBar": "lib/features/financial/presentation/widgets/financial_list_filters_bar.dart",
+      "usedOn": ["rental properties", "leases", "bookings", "charges", "financial records", "financial reports", "dashboard", "tickets", "work orders", "providers", "materials"]
     },
     "rentalScreens": {
       "charges": {
@@ -421,6 +437,12 @@
   "chatSessionWorkSummary": {
     "period": "2026 conversation through 2026-06-27",
     "completedItems": [
+      "Dashboard: escopo por módulo (DashboardFinancialModule maintenance vs rental)",
+      "Financeiro manutenção: excludeRentalModule + rental_charge_id; sem receitas de locação",
+      "Financeiro: filtros em carrossel (lançamentos, relatórios condomínio/gestora) + MonthFilterBar",
+      "ClayDropdownField compact + ellipsis; carrossel 92px; grade responsiva limita colunas",
+      "UX: cards dashboard 2x2; chamados/OS Wrap chips prioridade; AppModuleSwitcher sem texto cortado",
+      "Despesas: UI anexos NF/recibo (rental_expense_attachments_editor)",
       "iOS boot: bootstrap_app retry + supabase_bootstrap session sanitization + Runner Release scheme",
       "Multi-tenant security migration 00053 (management_company_id, RLS financeiro)",
       "Despesas: anexos NF/recibo migration 00054 + entity rental_expense_attachment",

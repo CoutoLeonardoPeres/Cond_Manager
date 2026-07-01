@@ -1,8 +1,9 @@
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/features/financial/presentation/providers/financial_providers.dart';
+import 'package:cond_manager/features/financial/presentation/widgets/financial_list_filters_bar.dart';
 import 'package:cond_manager/features/financial/presentation/widgets/financial_report_view.dart';
-import 'package:cond_manager/shared/domain/enums/financial_scope.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
+import 'package:cond_manager/shared/widgets/form/month_filter_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,38 +16,64 @@ class FinancialCondoReportTab extends ConsumerWidget {
     final condosAsync = ref.watch(accessibleCondominiumsProvider);
     final summaryAsync = ref.watch(financialReportProvider(query));
 
+    void updateQuery(FinancialReportQuery next) {
+      ref.read(financialCondoReportFilterProvider.notifier).state = next;
+    }
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           child: condosAsync.when(
             data: (condos) {
-              if (condos.isEmpty) return const SizedBox.shrink();
-              final items = [
-                const _CondoOpt(id: null, label: 'Todos os condomínios'),
-                ...condos.map((c) => _CondoOpt(id: c.id, label: c.name)),
+              final fields = <Widget>[
+                MonthFilterBar(
+                  compact: true,
+                  month: query.referenceMonth,
+                  onChanged: (m) => updateQuery(query.withReferenceMonth(m)),
+                ),
               ];
-              final sel = items.firstWhere(
-                (o) => o.id == query.condominiumId,
-                orElse: () => items.first,
-              );
-              return ClayDropdownField<_CondoOpt>(
-                label: 'Condomínio',
-                value: sel,
-                items: items,
-                itemLabel: (o) => o.label,
-                onChanged: (v) {
-                  ref.read(financialCondoReportFilterProvider.notifier).state =
-                      FinancialReportQuery(
-                    scope: FinancialScope.condominium,
-                    condominiumId: v?.id,
-                    fromDate: query.fromDate,
-                    toDate: query.toDate,
-                  );
-                },
+
+              if (condos.isNotEmpty) {
+                final items = [
+                  const _CondoOpt(id: null, label: 'Todos os condomínios'),
+                  ...condos.map((c) => _CondoOpt(id: c.id, label: c.name)),
+                ];
+                final sel = items.firstWhere(
+                  (o) => o.id == query.condominiumId,
+                  orElse: () => items.first,
+                );
+                fields.add(
+                  ClayDropdownField<_CondoOpt>(
+                    compact: true,
+                    label: 'Condomínio',
+                    value: sel,
+                    items: items,
+                    itemLabel: (o) => o.label,
+                    onChanged: (v) => updateQuery(
+                      query.copyWith(
+                        condominiumId: v?.id,
+                        clearCondominium: v == null || v.id == null,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return FinancialListFiltersBar(
+                wideColumns: fields.length.clamp(1, 2),
+                fields: fields,
               );
             },
-            loading: () => const LinearProgressIndicator(),
+            loading: () => FinancialListFiltersBar(
+              fields: [
+                MonthFilterBar(
+                  compact: true,
+                  month: query.referenceMonth,
+                  onChanged: (m) => updateQuery(query.withReferenceMonth(m)),
+                ),
+              ],
+            ),
             error: (_, _) => const SizedBox.shrink(),
           ),
         ),

@@ -45,6 +45,7 @@ class FinancialRecord extends Equatable {
     this.recurrenceDayOfMonth,
     this.recurrenceActive = true,
     this.allocationParentId,
+    this.rentalChargeId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -86,6 +87,7 @@ class FinancialRecord extends Equatable {
   final int? recurrenceDayOfMonth;
   final bool recurrenceActive;
   final String? allocationParentId;
+  final String? rentalChargeId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -95,7 +97,13 @@ class FinancialRecord extends Equatable {
 
   bool get isRentalModuleExpense => rentalExpenseEntryType != null;
 
+  bool get isRentalModuleIncome => rentalChargeId != null;
+
   bool get isAllocationChild => allocationParentId != null;
+
+  /// Lançamento do módulo manutenção (exclui despesas, receitas e rateios de locação).
+  bool get belongsToMaintenanceModule =>
+      !isRentalModuleExpense && !isRentalModuleIncome && !isAllocationChild;
 
   String? get workOrderDisplay =>
       workOrderNumber != null ? 'OS-${workOrderNumber!.toString().padLeft(5, '0')}' : null;
@@ -113,6 +121,7 @@ class FinancialListFilter extends Equatable {
     this.fromDate,
     this.toDate,
     this.paidOnly,
+    this.excludeRentalModule = false,
   });
 
   final FinancialScope scope;
@@ -122,6 +131,8 @@ class FinancialListFilter extends Equatable {
   final DateTime? fromDate;
   final DateTime? toDate;
   final bool? paidOnly;
+  /// Quando true, omite lançamentos do módulo locação (despesas, receitas de cobrança e rateios).
+  final bool excludeRentalModule;
 
   FinancialListFilter copyWith({
     FinancialScope? scope,
@@ -131,6 +142,7 @@ class FinancialListFilter extends Equatable {
     DateTime? fromDate,
     DateTime? toDate,
     bool? paidOnly,
+    bool? excludeRentalModule,
     bool clearCondominium = false,
     bool clearRecordType = false,
     bool clearCategory = false,
@@ -144,11 +156,23 @@ class FinancialListFilter extends Equatable {
       fromDate: clearDates ? null : (fromDate ?? this.fromDate),
       toDate: clearDates ? null : (toDate ?? this.toDate),
       paidOnly: paidOnly ?? this.paidOnly,
+      excludeRentalModule: excludeRentalModule ?? this.excludeRentalModule,
     );
   }
 
+  FinancialListFilter withReferenceMonth(DateTime? month) {
+    if (month == null) return copyWith(clearDates: true);
+    final from = DateTime(month.year, month.month, 1);
+    final to = DateTime(month.year, month.month + 1, 0);
+    return copyWith(fromDate: from, toDate: to);
+  }
+
+  DateTime? get referenceMonth =>
+      fromDate == null ? null : DateTime(fromDate!.year, fromDate!.month, 1);
+
   @override
-  List<Object?> get props => [scope, condominiumId, recordType, category, fromDate, toDate];
+  List<Object?> get props =>
+      [scope, condominiumId, recordType, category, fromDate, toDate, paidOnly, excludeRentalModule];
 }
 
 class FinancialCategoryBreakdown extends Equatable {

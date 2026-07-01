@@ -49,6 +49,7 @@ class _AppModuleSwitcherState extends ConsumerState<AppModuleSwitcher> {
     final iconSize = compact ? 15.0 : 20.0;
     final labelSize = compact ? 11.0 : 13.0;
     final swapSize = compact ? 14.0 : 18.0;
+    final label = active.label;
 
     return Padding(
       padding: EdgeInsets.only(right: compact ? 4 : 8),
@@ -66,8 +67,7 @@ class _AppModuleSwitcherState extends ConsumerState<AppModuleSwitcher> {
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               height: compact ? 32 : 40,
-              padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 14),
-              constraints: compact ? const BoxConstraints(maxWidth: 118) : null,
+              padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14),
               decoration: BoxDecoration(
                 gradient: _hovered ? style.gradientHover : style.gradient,
                 borderRadius: BorderRadius.circular(ClayTokens.radiusFull),
@@ -80,21 +80,19 @@ class _AppModuleSwitcherState extends ConsumerState<AppModuleSwitcher> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(style.icon, color: Colors.white, size: iconSize),
-                  SizedBox(width: compact ? 5 : 8),
-                  Flexible(
-                    child: Text(
-                      active.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.body(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: labelSize,
-                        height: 1.1,
-                      ),
+                  SizedBox(width: compact ? 6 : 8),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: AppTypography.body(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: labelSize,
+                      height: 1.1,
                     ),
                   ),
-                  SizedBox(width: compact ? 3 : 6),
+                  SizedBox(width: compact ? 4 : 6),
                   Icon(
                     Icons.swap_horiz_rounded,
                     color: Colors.white.withValues(alpha: 0.9),

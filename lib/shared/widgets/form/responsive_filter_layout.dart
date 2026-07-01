@@ -26,11 +26,14 @@ class ResponsiveFilterLayout extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= wideBreakpoint) {
+          final effectiveColumns = wideColumns
+              .clamp(1, fields.length)
+              .clamp(1, formColumnsForWidth(constraints.maxWidth));
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               FormGrid(
-                columns: wideColumns,
+                columns: effectiveColumns,
                 items: fields.map((f) => FormGridField(child: f)).toList(),
               ),
               if (trailing != null) ...[

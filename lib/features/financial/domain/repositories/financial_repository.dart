@@ -48,5 +48,6 @@ abstract class FinancialRepository {
     String? condominiumId,
     DateTime? fromDate,
     DateTime? toDate,
+    bool excludeRentalModule = false,
   });
 }

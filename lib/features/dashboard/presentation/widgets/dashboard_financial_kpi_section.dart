@@ -11,14 +11,16 @@ class DashboardFinancialKpiSection extends ConsumerWidget {
     super.key,
     this.compact = false,
     this.pairOccupancyProfitability = false,
+    this.module = DashboardFinancialModule.maintenance,
   });
 
   final bool compact;
   final bool pairOccupancyProfitability;
+  final DashboardFinancialModule module;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final metricsAsync = ref.watch(dashboardFinancialMetricsProvider);
+    final metricsAsync = ref.watch(dashboardFinancialMetricsProvider(module));
     final currency = NumberFormat.currency(locale: 'pt_BR', symbol: r'R$');
     final percent = NumberFormat.decimalPattern('pt_BR');
 
@@ -45,7 +47,7 @@ class DashboardFinancialKpiSection extends ConsumerWidget {
               style: TextStyle(color: ClayTokens.error, fontSize: compact ? 9 : 13),
             ),
             TextButton(
-              onPressed: () => ref.invalidate(dashboardFinancialMetricsProvider),
+              onPressed: () => ref.invalidate(dashboardFinancialMetricsProvider(module)),
               child: Text('Tentar novamente', style: TextStyle(fontSize: compact ? 10 : 14)),
             ),
           ],
@@ -57,6 +59,7 @@ class DashboardFinancialKpiSection extends ConsumerWidget {
         percent: percent,
         compact: compact,
         pairOccupancyProfitability: pairOccupancyProfitability,
+        module: module,
       ),
     );
   }
@@ -69,6 +72,7 @@ class _KpiGrid extends StatelessWidget {
     required this.percent,
     required this.compact,
     required this.pairOccupancyProfitability,
+    required this.module,
   });
 
   final DashboardFinancialMetrics metrics;
@@ -76,6 +80,9 @@ class _KpiGrid extends StatelessWidget {
   final NumberFormat percent;
   final bool compact;
   final bool pairOccupancyProfitability;
+  final DashboardFinancialModule module;
+
+  bool get _showOccupancy => module == DashboardFinancialModule.rental && metrics.hasRentalModule;
 
   String _money(double v) => compact
       ? NumberFormat.compactCurrency(locale: 'pt_BR', symbol: r'R$').format(v)
@@ -94,7 +101,9 @@ class _KpiGrid extends StatelessWidget {
 
   ClayStatCard _profitabilityCard(BuildContext context) => ClayStatCard(
         compact: compact,
-        title: 'Margem rentabilidade',
+        title: module == DashboardFinancialModule.maintenance
+            ? 'Margem manutenção'
+            : 'Margem rentabilidade',
         value: _pct(metrics.overallProfitMargin),
         icon: Icons.insights_rounded,
         accentColor: ClayTokens.tertiary,
@@ -161,13 +170,16 @@ class _KpiGrid extends StatelessWidget {
                     .toList(),
               ),
               SizedBox(height: spacing),
-              Row(
-                children: [
-                  Expanded(child: _occupancyCard(context)),
-                  SizedBox(width: spacing),
-                  Expanded(child: _profitabilityCard(context)),
-                ],
-              ),
+              if (_showOccupancy)
+                Row(
+                  children: [
+                    Expanded(child: _occupancyCard(context)),
+                    SizedBox(width: spacing),
+                    Expanded(child: _profitabilityCard(context)),
+                  ],
+                )
+              else if (metrics.unitProfitability.isNotEmpty)
+                _profitabilityCard(context),
             ],
           );
         },
@@ -197,8 +209,9 @@ class _KpiGrid extends StatelessWidget {
           childAspectRatio: compact ? 3.4 : (crossAxisCount == 1 ? 2.4 : 1.65),
           children: [
             ..._financialCards(context),
-            _occupancyCard(context),
-            _profitabilityCard(context),
+            if (_showOccupancy) _occupancyCard(context),
+            if (metrics.unitProfitability.isNotEmpty || _showOccupancy)
+              _profitabilityCard(context),
           ],
         );
       },

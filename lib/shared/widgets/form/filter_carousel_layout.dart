@@ -85,9 +85,12 @@ class _FilterCarouselLayoutState extends State<FilterCarouselLayout> {
             itemBuilder: (context, index) {
               return Padding(
                 padding: widget.pagePadding,
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: widget.items[index],
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: widget.items[index],
+                  ),
                 ),
               );
             },

@@ -130,8 +130,9 @@ flutter run --release --dart-define-from-file=dart_defines.json
 
 - **Boot iOS robusto** — `bootstrap_app.dart` + `supabase_bootstrap.dart`: retry, limpeza de sessão corrompida, scheme Release no Xcode
 - **Barra inferior personalizável** — Menu → *Personalizar barra inferior* (até 4 atalhos + Menu)
-- **Filtros em carrossel** — telas com muitos filtros usam `FilterCarouselLayout`
-- **Dashboard financeiro** — KPIs e gráficos Clay na home manutenção e locação
+- **Filtros em carrossel** — telas com muitos filtros usam `FilterCarouselLayout` / `ResponsiveFilterLayout` (locação + **financeiro**)
+- **Financeiro manutenção** — sem receitas/despesas de locação (`excludeRentalModule`, `rental_charge_id`); relatórios e lançamentos com filtro de mês
+- **Dashboard por módulo** — manutenção sem KPIs de ocupação; locação com ocupação e cobranças
 - **Cobranças** — board 3 colunas, botão *Pagar* ampliado nos cards
 - **Despesas** — planilha compacta no mobile; rateio por unidade; anexos NF/recibo (migration `00054`)
 - **Multi-tenant** — isolamento por gestora (`00053`)

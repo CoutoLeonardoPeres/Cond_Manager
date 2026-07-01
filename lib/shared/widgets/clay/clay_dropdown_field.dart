@@ -12,6 +12,7 @@ class ClayDropdownField<T> extends StatelessWidget {
     this.value,
     this.onChanged,
     this.validator,
+    this.compact = false,
   });
 
   final List<T> items;
@@ -21,21 +22,33 @@ class ClayDropdownField<T> extends StatelessWidget {
   final T? value;
   final void Function(T?)? onChanged;
   final String? Function(T?)? validator;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: ClayTokens.foreground,
+          fontSize: compact ? 13 : null,
+        );
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (label != null) ...[
           Text(
             label!,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: ClayTokens.textSecondary,
-                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: (compact
+                    ? Theme.of(context).textTheme.labelSmall
+                    : Theme.of(context).textTheme.labelMedium)
+                ?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: ClayTokens.textSecondary,
+            ),
           ),
-          SizedBox(height: ClayTokens.gap(8)),
+          SizedBox(height: compact ? 4 : ClayTokens.gap(8)),
         ],
         Container(
           decoration: BoxDecoration(
@@ -47,10 +60,11 @@ class ClayDropdownField<T> extends StatelessWidget {
               width: 1,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 12),
           child: DropdownButtonFormField<T>(
             value: value,
             isExpanded: true,
+            isDense: compact,
             borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
             dropdownColor: ClayTokens.surfaceRaised,
             elevation: 12,
@@ -58,18 +72,31 @@ class ClayDropdownField<T> extends StatelessWidget {
             icon: Icon(
               Icons.keyboard_arrow_down_rounded,
               color: ClayTokens.muted,
+              size: compact ? 20 : 24,
             ),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: ClayTokens.foreground,
-                ),
+            style: bodyStyle,
             decoration: InputDecoration(
               hintText: hint,
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
               errorBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              isDense: compact,
+              contentPadding: EdgeInsets.symmetric(vertical: compact ? 4 : 8),
             ),
+            selectedItemBuilder: (context) => items
+                .map(
+                  (item) => Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      itemLabel(item),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: bodyStyle,
+                    ),
+                  ),
+                )
+                .toList(),
             items: items
                 .map(
                   (item) => DropdownMenuItem<T>(
@@ -79,7 +106,8 @@ class ClayDropdownField<T> extends StatelessWidget {
                       child: Text(
                         itemLabel(item),
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        maxLines: compact ? 2 : 1,
+                        style: bodyStyle,
                       ),
                     ),
                   ),

@@ -3,10 +3,12 @@ import 'package:cond_manager/features/condominiums/domain/entities/condominium.d
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/features/financial/presentation/providers/financial_providers.dart';
 import 'package:cond_manager/features/financial/presentation/utils/financial_permissions.dart';
+import 'package:cond_manager/features/financial/presentation/widgets/financial_list_filters_bar.dart';
 import 'package:cond_manager/shared/domain/enums/financial_category.dart';
 import 'package:cond_manager/shared/domain/enums/financial_record_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_scope.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
+import 'package:cond_manager/shared/widgets/form/month_filter_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -35,60 +37,73 @@ class FinancialRecordsTab extends ConsumerWidget {
         Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              padding: EdgeInsets.fromLTRB(
+                MediaQuery.sizeOf(context).width < 640 ? 12 : 20,
+                12,
+                MediaQuery.sizeOf(context).width < 640 ? 12 : 20,
+                8,
+              ),
               child: Column(
                 children: [
-                  SegmentedButton<FinancialScope>(
-                    segments: const [
-                      ButtonSegment(
-                        value: FinancialScope.condominium,
-                        label: Text('Condomínio'),
-                        icon: Icon(Icons.apartment_rounded, size: 18),
-                      ),
-                      ButtonSegment(
-                        value: FinancialScope.managementCompany,
-                        label: Text('Gestora'),
-                        icon: Icon(Icons.business_rounded, size: 18),
-                      ),
-                    ],
-                    selected: {filter.scope},
-                    onSelectionChanged: (s) {
-                      ref.read(financialListFilterProvider.notifier).state =
-                          filter.copyWith(scope: s.first, clearCondominium: true);
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final narrow = constraints.maxWidth < 380;
+                      return SegmentedButton<FinancialScope>(
+                        segments: [
+                          ButtonSegment(
+                            value: FinancialScope.condominium,
+                            label: const Text('Condomínio'),
+                            icon: narrow ? null : const Icon(Icons.apartment_rounded, size: 18),
+                          ),
+                          ButtonSegment(
+                            value: FinancialScope.managementCompany,
+                            label: const Text('Gestora'),
+                            icon: narrow ? null : const Icon(Icons.business_rounded, size: 18),
+                          ),
+                        ],
+                        selected: {filter.scope},
+                        onSelectionChanged: (s) {
+                          ref.read(financialListFilterProvider.notifier).state =
+                              filter.copyWith(scope: s.first, clearCondominium: true);
+                        },
+                      );
                     },
                   ),
                   const SizedBox(height: 12),
-                  if (filter.scope == FinancialScope.condominium)
-                    condosAsync.when(
-                      data: (condos) {
-                        if (condos.isEmpty) return const SizedBox.shrink();
-                        return ClayDropdownField<Condominium?>(
-                          label: 'Condomínio',
-                          value: filter.condominiumId != null
-                              ? condos.cast<Condominium?>().firstWhere(
-                                    (c) => c?.id == filter.condominiumId,
-                                    orElse: () => null,
-                                  )
-                              : null,
-                          items: [null, ...condos],
-                          itemLabel: (c) => c?.name ?? 'Todos',
-                          onChanged: (v) {
+                  condosAsync.when(
+                    data: (condos) => FinancialListFiltersBar(
+                      wideColumns: filter.scope == FinancialScope.condominium ? 4 : 3,
+                      fields: [
+                        if (filter.scope == FinancialScope.condominium && condos.isNotEmpty)
+                          ClayDropdownField<Condominium?>(
+                            compact: true,
+                            label: 'Condomínio',
+                            value: filter.condominiumId != null
+                                ? condos.cast<Condominium?>().firstWhere(
+                                      (c) => c?.id == filter.condominiumId,
+                                      orElse: () => null,
+                                    )
+                                : null,
+                            items: [null, ...condos],
+                            itemLabel: (c) => c?.name ?? 'Todos',
+                            onChanged: (v) {
+                              ref.read(financialListFilterProvider.notifier).state =
+                                  filter.copyWith(
+                                condominiumId: v?.id,
+                                clearCondominium: v == null,
+                              );
+                            },
+                          ),
+                        MonthFilterBar(
+                          compact: true,
+                          month: filter.referenceMonth,
+                          onChanged: (m) {
                             ref.read(financialListFilterProvider.notifier).state =
-                                filter.copyWith(
-                              condominiumId: v?.id,
-                              clearCondominium: v == null,
-                            );
+                                filter.withReferenceMonth(m);
                           },
-                        );
-                      },
-                      loading: () => const LinearProgressIndicator(),
-                      error: (_, _) => const SizedBox.shrink(),
-                    ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClayDropdownField<FinancialRecordType?>(
+                        ),
+                        ClayDropdownField<FinancialRecordType?>(
+                          compact: true,
                           label: 'Tipo',
                           value: filter.recordType,
                           items: [null, ...FinancialRecordType.values],
@@ -98,10 +113,8 @@ class FinancialRecordsTab extends ConsumerWidget {
                                 filter.copyWith(recordType: v, clearRecordType: v == null);
                           },
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ClayDropdownField<FinancialCategory?>(
+                        ClayDropdownField<FinancialCategory?>(
+                          compact: true,
                           label: 'Categoria',
                           value: filter.category,
                           items: [null, ...FinancialCategory.values],
@@ -111,8 +124,43 @@ class FinancialRecordsTab extends ConsumerWidget {
                                 filter.copyWith(category: v, clearCategory: v == null);
                           },
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    loading: () => FinancialListFiltersBar(
+                      fields: [
+                        MonthFilterBar(
+                          compact: true,
+                          month: filter.referenceMonth,
+                          onChanged: (m) {
+                            ref.read(financialListFilterProvider.notifier).state =
+                                filter.withReferenceMonth(m);
+                          },
+                        ),
+                        ClayDropdownField<FinancialRecordType?>(
+                          compact: true,
+                          label: 'Tipo',
+                          value: filter.recordType,
+                          items: [null, ...FinancialRecordType.values],
+                          itemLabel: (t) => t?.label ?? 'Todos',
+                          onChanged: (v) {
+                            ref.read(financialListFilterProvider.notifier).state =
+                                filter.copyWith(recordType: v, clearRecordType: v == null);
+                          },
+                        ),
+                        ClayDropdownField<FinancialCategory?>(
+                          compact: true,
+                          label: 'Categoria',
+                          value: filter.category,
+                          items: [null, ...FinancialCategory.values],
+                          itemLabel: (c) => c?.label ?? 'Todas',
+                          onChanged: (v) {
+                            ref.read(financialListFilterProvider.notifier).state =
+                                filter.copyWith(category: v, clearCategory: v == null);
+                          },
+                        ),
+                      ],
+                    ),
+                    error: (_, _) => const SizedBox.shrink(),
                   ),
                 ],
               ),

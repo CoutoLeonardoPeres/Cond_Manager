@@ -251,6 +251,8 @@ class _WorkOrderTile extends StatelessWidget {
               children: [
                 Text(
                   '${workOrder.displayNumber} · ${workOrder.title}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
                 const SizedBox(height: 4),
@@ -262,13 +264,17 @@ class _WorkOrderTile extends StatelessWidget {
                       'CH-${workOrder.ticketNumber!.toString().padLeft(5, '0')}',
                     dateLabel,
                   ].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: ClayTokens.textSecondary, fontSize: 12, height: 1.35),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     WorkOrderStatusChip(status: workOrder.status),
-                    const SizedBox(width: 12),
                     PriorityBadge(priority: workOrder.priority),
                   ],
                 ),

@@ -46,7 +46,7 @@ flutter run --dart-define-from-file=dart_defines.json
 | **Manutenção** | `/` | Dashboard, chamados, OS, materiais, preventivas, financeiro, condomínios |
 | **Locação** | `/rental` | Imóveis, contratos, reservas, calendário/Gantt, cobranças, despesas, partes |
 
-Alternância via `AppModuleSwitcher` + `activeAppModuleProvider`. Permissões em `lib/core/permissions/app_permissions.dart` (tiers: platformAdmin, manager, analyst, fieldTeam, client, legacyStaff).
+Alternância via `AppModuleSwitcher` (sem `maxWidth` no mobile — rótulo completo) + `activeAppModuleProvider`. Permissões em `lib/core/permissions/app_permissions.dart` (tiers: platformAdmin, manager, analyst, fieldTeam, client, legacyStaff).
 
 ---
 
@@ -74,23 +74,44 @@ Alternância via `AppModuleSwitcher` + `activeAppModuleProvider`. Permissões em
 ## 4. Dashboards (implementados neste chat)
 
 ### Home manutenção (`DashboardPage` — `/`)
-- Cards compactos: chamados, OS, preventivas, estoque baixo
-- **Financeiro e manutenção:** 6 KPIs (saldo mensal/anual, despesas, ocupação, margem rentabilidade)
-- 5 gráficos Clay customizados (sem fl_chart): despesas mensais, comparativo anual, ocupação, por imóvel, rentabilidade/unidade
+- Cards compactos **2×2**: chamados, OS, preventivas, estoque baixo (`ClayStatCard` layout vertical)
+- **Financeiro da manutenção:** KPIs só do módulo manutenção (sem ocupação/locação)
+- 4 KPIs financeiros + margem manutenção; gráficos de despesas e comparativo anual (sem ocupação)
 - Filtros compactos: condomínio, período, ano
-- `dashboardFinancialMetricsProvider` agrega `financial_records` + dados rental
+- `dashboardFinancialMetricsProvider(DashboardFinancialModule.maintenance)` — exclui rental via `excludeRentalModule`
 
 ### Home locação (`RentalDashboardPage` — `/rental`)
 - Mini-cards: imóveis, contratos, reservas, contas a vencer
-- Mesmos KPIs e gráficos (modo compacto)
+- KPIs e gráficos com ocupação + rentabilidade (`DashboardFinancialModule.rental`)
 - **Layout especial:** ocupação + rentabilidade KPI lado a lado; gráficos ocupação por imóvel + rentabilidade por unidade lado a lado
 
 ### Arquivos-chave dashboard
 - `lib/features/dashboard/domain/dashboard_financial_metrics.dart`
-- `lib/features/dashboard/presentation/providers/dashboard_financial_providers.dart`
+- `lib/features/dashboard/presentation/providers/dashboard_financial_providers.dart` — enum `DashboardFinancialModule`
 - `lib/features/dashboard/presentation/widgets/clay_chart_widgets.dart`
 - `lib/features/dashboard/presentation/widgets/dashboard_financial_kpi_section.dart`
 - `lib/features/dashboard/presentation/widgets/dashboard_charts_section.dart`
+
+---
+
+## 4b. Financeiro manutenção vs locação
+
+### Isolamento de dados
+- **Manutenção** (`/financial`): `excludeRentalModule: true` em listas e relatórios
+- Exclui: despesas com `rental_expense_entry_type`, rateios (`allocation_parent_id`), receitas de cobrança (`rental_charge_id`)
+- `FinancialRecord.belongsToMaintenanceModule` — getter de domínio
+- Receitas de aluguel/locação ficam em **Locação → Cobranças** (sync para `financial_records` com `rental_charge_id`)
+
+### Filtros em carrossel (financeiro)
+- `FinancialListFiltersBar` + `MonthFilterBar` (shared) + `ResponsiveFilterLayout`
+- Telas: **Lançamentos**, **Relatório condomínio**, **Relatório gestora**
+- `ClayDropdownField(compact: true)` com ellipsis no valor selecionado
+- Carrossel mobile: altura 92px; grade responsiva limita colunas pela largura
+
+### Arquivos-chave financeiro
+- `lib/features/financial/presentation/widgets/financial_list_filters_bar.dart`
+- `lib/shared/widgets/form/month_filter_bar.dart`
+- `lib/features/financial/presentation/providers/financial_providers.dart`
 
 ---
 
@@ -115,7 +136,12 @@ Alternância via `AppModuleSwitcher` + `activeAppModuleProvider`. Permissões em
 - `app_shell_page.dart` — atalhos salvos por módulo; loading enquanto `authStateProvider` restaura sessão
 
 ### Filtros
-- `filter_carousel_layout.dart` / `responsive_filter_layout.dart` — carrossel em telas com vários filtros (imóveis, contratos, reservas, cobranças, dashboard, etc.)
+- `filter_carousel_layout.dart` / `responsive_filter_layout.dart` / `month_filter_bar.dart` — carrossel em telas com vários filtros (imóveis, contratos, reservas, cobranças, **financeiro**, dashboard, etc.)
+- `ClayDropdownField(compact: true)` — modo denso para filtros; ellipsis no valor selecionado
+
+### Chamados e OS (listas)
+- Cards de lista: `Wrap` para chips status + prioridade (evita overflow do badge *Urgente*)
+- Título/subtítulo com `maxLines` + ellipsis
 
 ### Cobranças
 - Board 3 colunas no iPhone (`rental_charges_board.dart`, `ultraCompact`)
@@ -159,6 +185,7 @@ Alternância via `AppModuleSwitcher` + `activeAppModuleProvider`. Permissões em
 - Contas fixas recorrentes; cópia mês a mês (`generateRecurringRentalExpenses`)
 - Alocação por unidade; `block_id` em financial_records (migration 00052)
 - Anexos NF/recibo por despesa (`rental_expense_attachments`, migration 00054)
+- UI: `rental_expense_attachments_editor.dart` (Foto/PDF até 20 MB) em formulário, detalhe, draft e planilha
 - Multi-tenant financeiro (`management_company_id`, migration 00053)
 - Migrations: 00050–00054
 
@@ -184,7 +211,7 @@ Alternância via `AppModuleSwitcher` + `activeAppModuleProvider`. Permissões em
 `rental_properties`, `rental_leases`, `rental_bookings`, `rental_parties`, `rental_charges`, `rental_property_inclusions`, `rental_property_photos`, `rental_tenant_intake_forms`
 
 ### Financial + rental
-`financial_records` com campos rental (`rental_expense_entry_type`, `rental_property_id`, `block_id`, recorrência, work_order_id, etc.)
+`financial_records` com campos rental (`rental_expense_entry_type`, `rental_property_id`, `rental_charge_id`, `block_id`, recorrência, work_order_id, etc.)
 
 ---
 
@@ -212,7 +239,7 @@ Leia docs/HISTORICO_CHAT_E_SISTEMA.md e docs/cond_manager_system_blueprint.json.
 Módulos: manutenção (/) e locação (/rental).
 Design: Soft Dark & Mint, widgets Clay.
 Credenciais: dart_defines.json (ver dart_defines.example.json) ou .env.
-Último trabalho: boot iOS robusto, multi-tenant (00053), anexos despesas (00054), dashboard financeiro, UX mobile (barra personalizável, planilha despesas compacta, ocupação).
+Último trabalho: isolamento financeiro manutenção/locação, filtros financeiro em carrossel, dashboard por módulo, anexos despesas (00054), UX cards chamados/OS, boot iOS, multi-tenant (00053).
 [descreva sua tarefa aqui]
 ```
 

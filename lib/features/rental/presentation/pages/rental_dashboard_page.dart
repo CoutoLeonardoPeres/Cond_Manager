@@ -34,12 +34,12 @@ class RentalDashboardPage extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(dashboardFinancialMetricsProvider);
+        ref.invalidate(dashboardFinancialMetricsProvider(DashboardFinancialModule.rental));
         ref.invalidate(rentalPropertiesListProvider);
         ref.invalidate(rentalLeasesListProvider);
         ref.invalidate(rentalShortStayBookingsListProvider);
         ref.invalidate(rentalExpenseDueAlertsProvider);
-        await ref.read(dashboardFinancialMetricsProvider.future);
+        await ref.read(dashboardFinancialMetricsProvider(DashboardFinancialModule.rental).future);
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -136,12 +136,14 @@ class RentalDashboardPage extends ConsumerWidget {
             const DashboardFinancialKpiSection(
               compact: true,
               pairOccupancyProfitability: true,
+              module: DashboardFinancialModule.rental,
             ),
             const SizedBox(height: 8),
             const DashboardChartsSection(
               compact: true,
               showHeader: false,
               pairOccupancyProfitabilityCharts: true,
+              module: DashboardFinancialModule.rental,
             ),
           ],
         ),

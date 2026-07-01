@@ -263,6 +263,8 @@ class _TicketTile extends StatelessWidget {
               children: [
                 Text(
                   '${ticket.displayNumber} · ${ticket.title}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
                 const SizedBox(height: 4),
@@ -272,6 +274,8 @@ class _TicketTile extends StatelessWidget {
                     ticket.serviceType.label,
                     dateLabel,
                   ].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: ClayTokens.textSecondary,
                     fontSize: 12,
@@ -279,10 +283,12 @@ class _TicketTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     TicketStatusChip(status: ticket.status),
-                    const SizedBox(width: 12),
                     PriorityBadge(priority: ticket.priority),
                   ],
                 ),

@@ -6,7 +6,6 @@ import 'package:cond_manager/features/rental/domain/entities/rental_property.dar
 import 'package:cond_manager/features/rental/presentation/widgets/rental_gantt_timeline.dart';
 import 'package:cond_manager/shared/domain/enums/financial_category.dart';
 import 'package:cond_manager/shared/domain/enums/financial_record_type.dart';
-import 'package:cond_manager/shared/domain/enums/rental_expense_entry_type.dart';
 import 'package:equatable/equatable.dart';
 
 class MonthlyFinancialPoint extends Equatable {
@@ -103,16 +102,17 @@ class DashboardFinancialMetrics extends Equatable {
 }
 
 bool isMaintenanceOrRepairExpense(FinancialRecord record) {
+  if (!record.belongsToMaintenanceModule) return false;
   if (record.recordType != FinancialRecordType.expense) return false;
   if (record.workOrderId != null) return true;
-  if (record.rentalExpenseEntryType == RentalExpenseEntryType.service ||
-      record.rentalExpenseEntryType == RentalExpenseEntryType.material) {
-    return true;
-  }
   return switch (record.category) {
     FinancialCategory.materials ||
     FinancialCategory.laborHour ||
-    FinancialCategory.contractedServices =>
+    FinancialCategory.contractedServices ||
+    FinancialCategory.personnel ||
+    FinancialCategory.freight ||
+    FinancialCategory.tax ||
+    FinancialCategory.overhead =>
       true,
     _ => false,
   };
@@ -163,6 +163,7 @@ DashboardFinancialMetrics computeDashboardFinancialMetrics({
   final records = [...condoRecords, ...companyRecords].where((r) {
     if (r.isRecurringTemplate) return false;
     if (r.isAllocationChild) return false;
+    if (!hasRentalModule && !r.belongsToMaintenanceModule) return false;
     if (condominiumId != null && r.condominiumId != null && r.condominiumId != condominiumId) {
       return false;
     }
@@ -298,6 +299,7 @@ DashboardFinancialMetrics computeDashboardFinancialMetrics({
   }
 
   for (final charge in paidCharges) {
+    if (!hasRentalModule) continue;
     if (charge.paidAt == null || charge.paidAt!.year != year) continue;
     final key = charge.propertyTitle != null ? 'charge:${charge.propertyTitle}' : 'charge:other';
     addUnit(key, charge.propertyTitle ?? 'Cobranças', revenue: charge.amount);

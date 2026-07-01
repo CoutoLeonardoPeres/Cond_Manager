@@ -16,21 +16,58 @@ class FinancialReportQuery extends Equatable {
     this.condominiumId,
     this.fromDate,
     this.toDate,
+    this.excludeRentalModule = false,
   });
 
   final FinancialScope scope;
   final String? condominiumId;
   final DateTime? fromDate;
   final DateTime? toDate;
+  final bool excludeRentalModule;
+
+  FinancialReportQuery copyWith({
+    FinancialScope? scope,
+    String? condominiumId,
+    DateTime? fromDate,
+    DateTime? toDate,
+    bool? excludeRentalModule,
+    bool clearCondominium = false,
+    bool clearDates = false,
+  }) {
+    return FinancialReportQuery(
+      scope: scope ?? this.scope,
+      condominiumId: clearCondominium ? null : (condominiumId ?? this.condominiumId),
+      fromDate: clearDates ? null : (fromDate ?? this.fromDate),
+      toDate: clearDates ? null : (toDate ?? this.toDate),
+      excludeRentalModule: excludeRentalModule ?? this.excludeRentalModule,
+    );
+  }
+
+  FinancialReportQuery withReferenceMonth(DateTime? month) {
+    if (month == null) return copyWith(clearDates: true);
+    final from = DateTime(month.year, month.month, 1);
+    final to = DateTime(month.year, month.month + 1, 0);
+    return copyWith(fromDate: from, toDate: to);
+  }
+
+  DateTime? get referenceMonth =>
+      fromDate == null ? null : DateTime(fromDate!.year, fromDate!.month, 1);
 
   @override
-  List<Object?> get props => [scope, condominiumId, fromDate, toDate];
+  List<Object?> get props =>
+      [scope, condominiumId, fromDate, toDate, excludeRentalModule];
 }
+
+DateTime _currentMonthStart() => DateTime(DateTime.now().year, DateTime.now().month, 1);
+
+DateTime _currentMonthEnd() => DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
 
 final financialListFilterProvider = StateProvider<FinancialListFilter>(
   (ref) => FinancialListFilter(
     scope: FinancialScope.condominium,
-    fromDate: DateTime(DateTime.now().year, DateTime.now().month, 1),
+    fromDate: _currentMonthStart(),
+    toDate: _currentMonthEnd(),
+    excludeRentalModule: true,
   ),
 );
 
@@ -64,6 +101,7 @@ final financialReportProvider =
       condominiumId: query.condominiumId,
       fromDate: query.fromDate,
       toDate: query.toDate,
+      excludeRentalModule: query.excludeRentalModule,
     );
     return result.when(
       success: (s) => s,
@@ -75,13 +113,17 @@ final financialReportProvider =
 final financialCondoReportFilterProvider = StateProvider<FinancialReportQuery>(
   (ref) => FinancialReportQuery(
     scope: FinancialScope.condominium,
-    fromDate: DateTime(DateTime.now().year, DateTime.now().month, 1),
+    fromDate: _currentMonthStart(),
+    toDate: _currentMonthEnd(),
+    excludeRentalModule: true,
   ),
 );
 
 final financialCompanyReportFilterProvider = StateProvider<FinancialReportQuery>(
   (ref) => FinancialReportQuery(
     scope: FinancialScope.managementCompany,
-    fromDate: DateTime(DateTime.now().year, DateTime.now().month, 1),
+    fromDate: _currentMonthStart(),
+    toDate: _currentMonthEnd(),
+    excludeRentalModule: true,
   ),
 );

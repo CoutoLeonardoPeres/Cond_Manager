@@ -1,12 +1,15 @@
 import 'package:cond_manager/core/router/navigation_helpers.dart';
+import 'package:cond_manager/core/utils/result.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/features/financial/domain/entities/financial_record.dart';
 import 'package:cond_manager/features/financial/presentation/providers/financial_providers.dart';
 import 'package:cond_manager/features/materials/domain/entities/material.dart' as mat;
 import 'package:cond_manager/features/materials/presentation/providers/material_providers.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_expense_attachment.dart';
 import 'package:cond_manager/features/rental/domain/utils/rental_expense_mapping.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_expense_attachments_editor.dart';
 import 'package:cond_manager/features/tickets/domain/entities/ticket.dart';
 import 'package:cond_manager/features/tickets/presentation/providers/ticket_providers.dart';
 import 'package:cond_manager/shared/domain/enums/condominium_bill_type.dart';
@@ -50,6 +53,7 @@ class _RentalExpenseFormPageState extends ConsumerState<RentalExpenseFormPage> {
   bool _loading = false;
   bool _loaded = false;
   String? _error;
+  final List<PendingRentalExpenseAttachment> _pendingAttachments = [];
 
   @override
   void dispose() {
@@ -165,7 +169,7 @@ class _RentalExpenseFormPageState extends ConsumerState<RentalExpenseFormPage> {
           final result = await repo.update(widget.expenseId!, _buildUpdateInput(record));
           if (!mounted) return;
           result.when(
-            success: (_) {
+            success: (_) async {
               ref.invalidate(rentalExpensesListProvider);
               ref.invalidate(rentalExpenseDueAlertsProvider);
               ref.invalidate(rentalExpenseDetailProvider(widget.expenseId!));
@@ -187,17 +191,29 @@ class _RentalExpenseFormPageState extends ConsumerState<RentalExpenseFormPage> {
 
     final result = await repo.create(_buildCreateInput());
     if (!mounted) return;
-    result.when(
-      success: (record) {
+
+    switch (result) {
+      case Success(:final data):
+        final attachmentError = await uploadPendingRentalExpenseAttachments(
+          ref: ref,
+          expenseId: data.id,
+          pending: _pendingAttachments,
+        );
+        if (!mounted) return;
         ref.invalidate(rentalExpensesListProvider);
         ref.invalidate(rentalExpenseDueAlertsProvider);
-        context.go('/rental/expenses/${record.id}');
-      },
-      failure: (e) => setState(() {
-        _loading = false;
-        _error = e.message;
-      }),
-    );
+        if (attachmentError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Despesa salva, mas anexos falharam: $attachmentError')),
+          );
+        }
+        context.go('/rental/expenses/${data.id}');
+      case Failure(:final error):
+        setState(() {
+          _loading = false;
+          _error = error.message;
+        });
+    }
   }
 
   @override
@@ -434,6 +450,17 @@ class _RentalExpenseFormPageState extends ConsumerState<RentalExpenseFormPage> {
               controller: _notesController,
               label: 'Observações',
               maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            RentalExpenseAttachmentsEditor(
+              expenseId: widget.isEditing ? widget.expenseId : null,
+              pending: _pendingAttachments,
+              onPendingChanged: (files) => setState(() {
+                _pendingAttachments
+                  ..clear()
+                  ..addAll(files);
+              }),
+              enabled: !_loading,
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),

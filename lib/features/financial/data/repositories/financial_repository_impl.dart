@@ -48,6 +48,12 @@ class FinancialRepositoryImpl implements FinancialRepository {
       } else if (filter.paidOnly == false) {
         query = query.isFilter('paid_at', null);
       }
+      if (filter.excludeRentalModule) {
+        query = query
+            .isFilter('rental_expense_entry_type', null)
+            .isFilter('allocation_parent_id', null)
+            .isFilter('rental_charge_id', null);
+      }
 
       final data = await query.order('reference_date', ascending: false);
 
@@ -451,12 +457,14 @@ class FinancialRepositoryImpl implements FinancialRepository {
     String? condominiumId,
     DateTime? fromDate,
     DateTime? toDate,
+    bool excludeRentalModule = false,
   }) async {
     final filter = FinancialListFilter(
       scope: scope,
       condominiumId: condominiumId,
       fromDate: fromDate,
       toDate: toDate,
+      excludeRentalModule: excludeRentalModule,
     );
     final listResult = await list(filter);
     return listResult.when(

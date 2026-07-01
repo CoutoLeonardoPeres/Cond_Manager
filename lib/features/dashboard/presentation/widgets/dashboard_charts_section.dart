@@ -13,15 +13,17 @@ class DashboardChartsSection extends ConsumerWidget {
     this.compact = false,
     this.showHeader = true,
     this.pairOccupancyProfitabilityCharts = false,
+    this.module = DashboardFinancialModule.maintenance,
   });
 
   final bool compact;
   final bool showHeader;
   final bool pairOccupancyProfitabilityCharts;
+  final DashboardFinancialModule module;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final metricsAsync = ref.watch(dashboardFinancialMetricsProvider);
+    final metricsAsync = ref.watch(dashboardFinancialMetricsProvider(module));
     final year = ref.watch(dashboardFilterProvider).effectiveYear;
     final currency = NumberFormat.currency(locale: 'pt_BR', symbol: r'R$', decimalDigits: 0);
 
@@ -45,7 +47,9 @@ class DashboardChartsSection extends ConsumerWidget {
             if (!compact) ...[
               const SizedBox(height: 4),
               Text(
-                'Ano $year · receitas, despesas, ocupação e custos por unidade',
+                module == DashboardFinancialModule.maintenance
+                    ? 'Ano $year · receitas e despesas da manutenção'
+                    : 'Ano $year · receitas, despesas, ocupação e custos por unidade',
                 style: const TextStyle(fontSize: 13, color: ClayTokens.textSecondary),
               ),
             ],
@@ -94,9 +98,10 @@ class DashboardChartsSection extends ConsumerWidget {
                       ),
                     )
                   : null;
-              final occupancyByPropertyChart = m.occupancyByProperty.isNotEmpty
-                  ? _OccupancyByPropertyChart(metrics: m, compact: compact)
-                  : null;
+              final occupancyByPropertyChart =
+                  m.hasRentalModule && m.occupancyByProperty.isNotEmpty
+                      ? _OccupancyByPropertyChart(metrics: m, compact: compact)
+                      : null;
               final unitProfitabilityChart = _UnitProfitabilityChart(
                 metrics: m,
                 currency: currency,

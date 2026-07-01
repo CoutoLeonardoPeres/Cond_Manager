@@ -1,13 +1,16 @@
+import 'package:cond_manager/core/utils/result.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/features/financial/domain/entities/financial_record.dart';
 import 'package:cond_manager/features/financial/presentation/providers/financial_providers.dart';
 import 'package:cond_manager/features/materials/domain/entities/material.dart' as mat;
 import 'package:cond_manager/features/materials/presentation/providers/material_providers.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_expense_attachment.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_expense_list_filter.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_expense_location.dart';
 import 'package:cond_manager/features/rental/domain/utils/rental_expense_mapping.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_expense_attachments_editor.dart';
 import 'package:cond_manager/shared/domain/enums/condominium_bill_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_record_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_scope.dart';
@@ -80,6 +83,7 @@ class _RentalExpenseDraftSheetState extends ConsumerState<RentalExpenseDraftShee
   bool _isPaid = false;
   bool _saving = false;
   String? _error;
+  final List<PendingRentalExpenseAttachment> _pendingAttachments = [];
 
   @override
   void initState() {
@@ -224,20 +228,27 @@ class _RentalExpenseDraftSheetState extends ConsumerState<RentalExpenseDraftShee
     final result = await ref.read(financialRepositoryProvider).create(_buildCreateInput());
     if (!mounted) return;
 
-    result.when(
-      success: (_) {
+    switch (result) {
+      case Success(:final data):
+        final attachmentError = await uploadPendingRentalExpenseAttachments(
+          ref: ref,
+          expenseId: data.id,
+          pending: _pendingAttachments,
+        );
+        if (!mounted) return;
         ref.invalidate(rentalExpensesListProvider);
         ref.invalidate(rentalExpenseDueAlertsProvider);
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Despesa registrada.')),
-        );
-      },
-      failure: (e) => setState(() {
-        _saving = false;
-        _error = e.message;
-      }),
-    );
+        final message = attachmentError != null
+            ? 'Despesa registrada, mas anexos falharam: $attachmentError'
+            : 'Despesa registrada.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      case Failure(:final error):
+        setState(() {
+          _saving = false;
+          _error = error.message;
+        });
+    }
   }
 
   @override
@@ -398,6 +409,16 @@ class _RentalExpenseDraftSheetState extends ConsumerState<RentalExpenseDraftShee
               title: const Text('Já paga'),
               value: _isPaid,
               onChanged: (v) => setState(() => _isPaid = v),
+            ),
+            const SizedBox(height: 12),
+            RentalExpenseAttachmentsEditor(
+              pending: _pendingAttachments,
+              onPendingChanged: (files) => setState(() {
+                _pendingAttachments
+                  ..clear()
+                  ..addAll(files);
+              }),
+              enabled: !_saving,
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),

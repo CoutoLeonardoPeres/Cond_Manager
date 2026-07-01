@@ -3,6 +3,7 @@ import 'package:cond_manager/features/auth/presentation/providers/auth_providers
 import 'package:cond_manager/features/rental/domain/utils/rental_expense_mapping.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_expense_allocate_sheet.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_expense_attachments_editor.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -130,6 +131,13 @@ class RentalExpenseDetailPage extends ConsumerWidget {
                   ),
                 ),
               ],
+              const SizedBox(height: 16),
+              RentalExpenseAttachmentsEditor(
+                expenseId: expenseId,
+                pending: const [],
+                onPendingChanged: (_) {},
+                enabled: canManage,
+              ),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 8,

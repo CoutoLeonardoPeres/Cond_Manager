@@ -44,10 +44,7 @@ class ProvidersListPage extends ConsumerWidget {
                 ),
                 data: (providers) {
                   if (providers.isEmpty) {
-                    return _EmptyState(
-                      canCreate: canCreate,
-                      onCreate: () => context.go('/providers/new'),
-                    );
+                    return const _EmptyState();
                   }
                   return RefreshIndicator(
                     onRefresh: () async => ref.invalidate(serviceProvidersListProvider),
@@ -193,10 +190,7 @@ class _ProviderTile extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.canCreate, required this.onCreate});
-
-  final bool canCreate;
-  final VoidCallback onCreate;
+  const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
@@ -218,10 +212,6 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(color: ClayTokens.textSecondary),
             ),
-            if (canCreate) ...[
-              const SizedBox(height: 20),
-              ClayButton(label: 'Cadastrar prestador', icon: Icons.add_rounded, onPressed: onCreate),
-            ],
           ],
         ),
       ),
