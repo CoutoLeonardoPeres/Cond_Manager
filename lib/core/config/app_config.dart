@@ -1,4 +1,4 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:cond_manager/core/config/env_loader.dart';
 
 class AppConfig {
   const AppConfig({
@@ -9,27 +9,64 @@ class AppConfig {
   final String supabaseUrl;
   final String supabaseAnonKey;
 
-  /// Lê credenciais de `--dart-define` ou do arquivo `.env` (dev local).
+  /// Lidos em compile-time (--dart-define). Não chamar [String.fromEnvironment] em runtime.
+  static const _defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+  static const _defineSupabaseAnonKey =
+      String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+
+  /// dart-define (build) → `.env` no bundle (runtime iOS/Android/Web).
   static Future<AppConfig> load() async {
-    try {
-      await dotenv.load(fileName: '.env');
-    } catch (_) {
-      // .env ausente em release ou asset não embutido — usa dart-define.
+    var url = _defineValue(_defineSupabaseUrl);
+    var key = _defineValue(_defineSupabaseAnonKey);
+
+    if (!_isComplete(url, key)) {
+      final asset = await EnvLoader.loadDotEnvAsset();
+      if (url.isEmpty) url = _clean(asset['SUPABASE_URL']);
+      if (key.isEmpty) key = _clean(asset['SUPABASE_ANON_KEY']);
     }
-
-    var url = const String.fromEnvironment('SUPABASE_URL');
-    var key = const String.fromEnvironment('SUPABASE_ANON_KEY');
-
-    if (url.isEmpty) url = dotenv.env['SUPABASE_URL']?.trim() ?? '';
-    if (key.isEmpty) key = dotenv.env['SUPABASE_ANON_KEY']?.trim() ?? '';
 
     if (url.isEmpty || key.isEmpty) {
       throw StateError(
-        'Configure SUPABASE_URL e SUPABASE_ANON_KEY no arquivo .env '
-        'ou via --dart-define / launch.json.',
+        'Configure SUPABASE_URL e SUPABASE_ANON_KEY no .env ou dart_defines.json '
+        'e rode Cond Manager (iOS Release).',
       );
+    }
+
+    if (!_isValidAnonKey(key)) {
+      throw StateError(
+        'SUPABASE_ANON_KEY inválida ou truncada. '
+        'Atualize o .env e reinstale o app.',
+      );
+    }
+
+    if (!url.startsWith('https://') || !url.contains('.supabase.co')) {
+      throw StateError('SUPABASE_URL inválida: $url');
     }
 
     return AppConfig(supabaseUrl: url, supabaseAnonKey: key);
   }
+
+  static bool _isComplete(String url, String key) =>
+      url.isNotEmpty && key.isNotEmpty && _isValidAnonKey(key);
+
+  static String _defineValue(String raw) {
+    final value = _clean(raw);
+    if (value.isEmpty || _looksTruncated(value)) return '';
+    return value;
+  }
+
+  static String _clean(String? value) {
+    if (value == null) return '';
+    var v = value.trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.substring(1, v.length - 1).trim();
+    }
+    return v;
+  }
+
+  static bool _looksTruncated(String value) =>
+      value.contains('...') || value.length < 80;
+
+  static bool _isValidAnonKey(String key) =>
+      !_looksTruncated(key) && key.split('.').length == 3;
 }

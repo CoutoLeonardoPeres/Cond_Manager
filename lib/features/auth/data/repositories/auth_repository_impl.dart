@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cond_manager/core/errors/app_exception.dart';
 import 'package:cond_manager/core/utils/result.dart';
 import 'package:cond_manager/features/auth/data/models/user_profile_model.dart';
@@ -65,11 +67,19 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Result<void>> signOut() async {
+    const timeout = Duration(seconds: 8);
     try {
-      await _client.auth.signOut();
+      await _client.auth
+          .signOut(scope: SignOutScope.local)
+          .timeout(timeout);
       return const Success(null);
     } catch (e) {
-      return Failure(NetworkException('Erro ao sair: $e'));
+      try {
+        await _client.auth.signOut().timeout(timeout);
+        return const Success(null);
+      } catch (e2) {
+        return Failure(NetworkException('Erro ao sair: $e2'));
+      }
     }
   }
 
@@ -210,6 +220,10 @@ class AuthRepositoryImpl implements AuthRepository {
     if (lower.contains('signup') && lower.contains('disabled')) {
       return 'Cadastro por e-mail está desativado no Supabase. '
           'Ative em Authentication → Providers → Email.';
+    }
+    if (lower.contains('invalid api key')) {
+      return 'Chave da API Supabase inválida no app. '
+          'Rode de novo com Cond Manager (iOS Release) após atualizar o .env.';
     }
     return message;
   }

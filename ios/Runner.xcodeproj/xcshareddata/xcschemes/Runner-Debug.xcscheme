@@ -10,7 +10,7 @@
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
                title = "Sync Dart Defines"
-               scriptText = "export PATH=&quot;$PATH:/opt/homebrew/bin:/usr/local/bin&quot;&#10;cd &quot;${SRCROOT}/..&quot;&#10;if [ -f dart_defines.json ]; then&#10;  flutter build ios --config-only --release --dart-define-from-file=dart_defines.json&#10;fi&#10;">
+               scriptText = "export PATH=&quot;$PATH:/opt/homebrew/bin:/usr/local/bin&quot;&#10;cd &quot;${SRCROOT}/..&quot;&#10;if [ -f dart_defines.json ]; then&#10;  flutter build ios --config-only --dart-define-from-file=dart_defines.json&#10;fi&#10;">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"
@@ -55,29 +55,18 @@
             ReferencedContainer = "container:Runner.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
-      <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "331C8080294A63A400263BE5"
-               BuildableName = "RunnerTests.xctest"
-               BlueprintName = "RunnerTests"
-               ReferencedContainer = "container:Runner.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-      </Testables>
    </TestAction>
    <LaunchAction
-      buildConfiguration = "Release"
-      selectedDebuggerIdentifier = ""
-      selectedLauncherIdentifier = "Xcode.IDEFoundation.Launcher.PosixSpawn"
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       customLLDBInitFile = "$(SRCROOT)/Flutter/ephemeral/flutter_lldbinit"
       launchStyle = "0"
       useCustomWorkingDirectory = "NO"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      enableQueueDebugging = "NO"
       allowLocationSimulation = "YES">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">

@@ -1,7 +1,6 @@
 import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 export 'clay_decorations.dart';
 export 'clay_tokens.dart';
@@ -100,7 +99,7 @@ class AppTheme {
         indicatorColor: ClayTokens.sidebarActive.withValues(alpha: 0.15),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.inter(
+          return AppTypography.body(
             fontSize: 11,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             color: selected ? ClayTokens.accent : ClayTokens.sidebarMuted,
@@ -112,12 +111,12 @@ class AppTheme {
         backgroundColor: ClayTokens.sidebar,
         selectedIconTheme: const IconThemeData(color: ClayTokens.accent, size: 24),
         unselectedIconTheme: const IconThemeData(color: ClayTokens.sidebarMuted, size: 24),
-        selectedLabelTextStyle: GoogleFonts.inter(
+        selectedLabelTextStyle: AppTypography.body(
           color: ClayTokens.accent,
           fontWeight: FontWeight.w600,
           fontSize: 12,
         ),
-        unselectedLabelTextStyle: GoogleFonts.inter(
+        unselectedLabelTextStyle: AppTypography.body(
           color: ClayTokens.sidebarMuted,
           fontWeight: FontWeight.w500,
           fontSize: 11,

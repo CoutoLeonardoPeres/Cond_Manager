@@ -1,4 +1,5 @@
 import 'package:cond_manager/core/theme/app_typography.dart';
+import 'package:cond_manager/shared/widgets/app_loading_scaffold.dart';
 import 'package:flutter/material.dart';
 
 /// Tela exibida quando Supabase não está configurado (evita página branca).
@@ -14,7 +15,7 @@ class ConfigErrorApp extends StatelessWidget {
       builder: (context, child) {
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: AppTypography.contentTextScaler),
-          child: child ?? const SizedBox.shrink(),
+          child: child ?? const AppLoadingScaffold(),
         );
       },
       home: Scaffold(

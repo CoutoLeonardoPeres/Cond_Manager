@@ -1,6 +1,7 @@
 import 'package:cond_manager/core/router/app_router.dart';
 import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/app_theme.dart';
+import 'package:cond_manager/shared/widgets/app_loading_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,7 +22,7 @@ class CondManagerApp extends ConsumerWidget {
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(textScaler: AppTypography.contentTextScaler),
-          child: child ?? const SizedBox.shrink(),
+          child: child ?? const AppLoadingScaffold(),
         );
       },
       locale: const Locale('pt', 'BR'),
