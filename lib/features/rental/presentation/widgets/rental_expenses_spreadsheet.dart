@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium_block.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
@@ -10,6 +12,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_expense_loca
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
 import 'package:cond_manager/features/rental/domain/utils/rental_expense_mapping.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_expense_draft_sheet.dart';
 import 'package:cond_manager/shared/domain/enums/condominium_bill_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_record_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_scope.dart';
@@ -25,6 +28,109 @@ import 'package:intl/intl.dart';
 final _spreadsheetDateFmt = DateFormat('dd/MM/yyyy');
 final _spreadsheetCurrency = NumberFormat.simpleCurrency(locale: 'pt_BR');
 
+/// Espaçamento vertical e tipografia das linhas da tabela (desktop).
+class SpreadsheetRowMetrics {
+  const SpreadsheetRowMetrics({
+    required this.padV,
+    required this.padVSm,
+    required this.cellOuterV,
+    required this.emptyPadV,
+    required this.fontSize,
+    required this.fontSizeSm,
+    required this.headerFontSize,
+    required this.actionIconSize,
+    required this.actionBtn,
+    required this.actionSpinner,
+    required this.spinner,
+    required this.checkbox,
+    required this.dropdownMenuItemHeight,
+    this.rowHeight,
+  });
+
+  final double padV;
+  final double padVSm;
+  final double cellOuterV;
+  final double emptyPadV;
+  final double fontSize;
+  final double fontSizeSm;
+  final double headerFontSize;
+  final double actionIconSize;
+  final double actionBtn;
+  final double actionSpinner;
+  final double spinner;
+  final double checkbox;
+  final double dropdownMenuItemHeight;
+  /// Altura fixa da linha (mobile) — conteúdo centralizado verticalmente.
+  final double? rowHeight;
+
+  double get fieldPadV => rowHeight != null ? 0 : padV;
+
+  static const desktop = SpreadsheetRowMetrics(
+    padV: 4.5,
+    padVSm: 2.5,
+    cellOuterV: 0.6,
+    emptyPadV: 13.0,
+    fontSize: 11.0,
+    fontSizeSm: 10.0,
+    headerFontSize: 10.0,
+    actionIconSize: 14.0,
+    actionBtn: 21.0,
+    actionSpinner: 13.0,
+    spinner: 10.0,
+    checkbox: 16.0,
+    dropdownMenuItemHeight: 34.0,
+  );
+
+  static const mobile = SpreadsheetRowMetrics(
+    padV: 0.7,
+    padVSm: 0.25,
+    cellOuterV: 0.0,
+    emptyPadV: 5.0,
+    fontSize: 10.0,
+    fontSizeSm: 9.0,
+    headerFontSize: 9.0,
+    actionIconSize: 16.0,
+    actionBtn: 14.0,
+    actionSpinner: 6.0,
+    spinner: 5.0,
+    checkbox: 8.0,
+    dropdownMenuItemHeight: 18.0,
+    rowHeight: 17.0,
+  );
+
+  static SpreadsheetRowMetrics resolve(BuildContext context) {
+    return MediaQuery.sizeOf(context).width < 640 ? mobile : desktop;
+  }
+}
+
+class _SpreadsheetRowMetricsScope extends InheritedWidget {
+  const _SpreadsheetRowMetricsScope({required this.metrics, required super.child});
+
+  final SpreadsheetRowMetrics metrics;
+
+  static SpreadsheetRowMetrics of(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<_SpreadsheetRowMetricsScope>()
+            ?.metrics ??
+        SpreadsheetRowMetrics.desktop;
+  }
+
+  @override
+  bool updateShouldNotify(_SpreadsheetRowMetricsScope oldWidget) =>
+      oldWidget.metrics != metrics;
+}
+
+extension _SpreadsheetRowMetricsContext on BuildContext {
+  SpreadsheetRowMetrics get _sheetMetrics => _SpreadsheetRowMetricsScope.of(this);
+}
+
+/// Popup das listas dropdown (fonte +30%, cards e largura -30% vs menu padrão).
+const _dropdownMenuFontSize = 10.0;
+const _dropdownMenuMaxHeight = 137.0;
+const _dropdownMenuItemPadH = 8.0;
+const _dropdownIconSize = 8.0;
+const _dropdownRadius = 8.0;
+
 /// Planilha editável para despesas de locação (estilo Excel).
 class RentalExpensesSpreadsheet extends ConsumerStatefulWidget {
   const RentalExpensesSpreadsheet({
@@ -33,19 +139,21 @@ class RentalExpensesSpreadsheet extends ConsumerStatefulWidget {
     required this.condominiums,
     required this.filter,
     required this.canEdit,
+    this.showAddRowButton = true,
   });
 
   final List<FinancialRecord> expenses;
   final List<Condominium> condominiums;
   final RentalExpenseListFilter filter;
   final bool canEdit;
+  final bool showAddRowButton;
 
   @override
-  ConsumerState<RentalExpensesSpreadsheet> createState() => _RentalExpensesSpreadsheetState();
+  ConsumerState<RentalExpensesSpreadsheet> createState() => RentalExpensesSpreadsheetState();
 }
 
-class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpreadsheet> {
-  static const _tableWidth = 1340.0;
+class RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpreadsheet> {
+  static const _tableWidth = 1374.0;
 
   static final _tableBorder = TableBorder.all(
     color: ClayTokens.shadowDark.withValues(alpha: 0.35),
@@ -54,6 +162,7 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
 
   final List<_ExpenseRowData> _rows = [];
   int _draftCounter = 0;
+  int? _focusedRowIndex;
   final ScrollController _verticalScrollController = ScrollController();
   final ScrollController _horizontalScrollController = ScrollController();
 
@@ -137,8 +246,8 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
     setState(() {
       _rows
         ..clear()
-        ..addAll(merged)
-        ..addAll(drafts);
+        ..addAll(drafts)
+        ..addAll(merged);
     });
   }
 
@@ -157,15 +266,52 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
     }
   }
 
+  void addDraftRow() => _addDraftRow();
+
+  Future<void> openMobileDraftSheet() => showRentalExpenseDraftSheet(
+        context: context,
+        ref: ref,
+        condominiums: widget.condominiums,
+        filter: widget.filter,
+      );
+
+  void _setFocusedRow(int index) {
+    if (_focusedRowIndex != index) {
+      setState(() => _focusedRowIndex = index);
+    }
+  }
+
+  bool _isRowEditing(_ExpenseRowData row, int index) =>
+      row.isDraft || row.isDirty || _focusedRowIndex == index;
+
+  BoxDecoration? _rowDecoration(_ExpenseRowData row, int index) {
+    if (_isRowEditing(row, index)) {
+      return BoxDecoration(
+        color: ClayTokens.accentSurface.withValues(alpha: 0.75),
+        border: const Border(
+          left: BorderSide(color: ClayTokens.accent, width: 4),
+        ),
+      );
+    }
+    if (row.isRecurringTemplate && !row.isDraft) {
+      return BoxDecoration(
+        color: ClayTokens.tertiary.withValues(alpha: 0.04),
+      );
+    }
+    return null;
+  }
+
   void _addDraftRow() {
     setState(() {
-      _rows.add(
+      _rows.insert(
+        0,
         _ExpenseRowData.draft(
           key: 'draft_${_draftCounter++}',
           filter: widget.filter,
           condominiums: widget.condominiums,
         ),
       );
+      _focusedRowIndex = 0;
     });
   }
 
@@ -291,7 +437,14 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
         success: (_) {
           ref.invalidate(rentalExpensesListProvider);
           ref.invalidate(rentalExpenseDueAlertsProvider);
-          setState(() => _rows.removeAt(index));
+          setState(() {
+            _rows.removeAt(index);
+            if (_focusedRowIndex == index) {
+              _focusedRowIndex = null;
+            } else if (_focusedRowIndex != null && _focusedRowIndex! > index) {
+              _focusedRowIndex = _focusedRowIndex! - 1;
+            }
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Despesa registrada.')),
           );
@@ -324,6 +477,9 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
         ref.invalidate(rentalExpenseDueAlertsProvider);
         setState(() {
           _rows[index] = _ExpenseRowData.fromRecord(updated, widget.condominiums);
+          if (_focusedRowIndex == index) {
+            _focusedRowIndex = null;
+          }
         });
         if (!quiet) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -344,7 +500,14 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
     if (row.isSaving) return;
 
     if (row.isDraft) {
-      setState(() => _rows.removeAt(index));
+      setState(() {
+        _rows.removeAt(index);
+        if (_focusedRowIndex == index) {
+          _focusedRowIndex = null;
+        } else if (_focusedRowIndex != null && _focusedRowIndex! > index) {
+          _focusedRowIndex = _focusedRowIndex! - 1;
+        }
+      });
       return;
     }
 
@@ -398,38 +561,45 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
   }
 
   Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+    final m = context._sheetMetrics;
+    final content = Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: m.fieldPadV),
       child: Text(
         text,
         textAlign: align,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w700,
-          fontSize: 11,
+          fontSize: m.headerFontSize,
           color: ClayTokens.textSecondary,
         ),
       ),
     );
+    if (m.rowHeight == null) return content;
+    return SizedBox(
+      height: m.rowHeight,
+      child: Center(child: content),
+    );
   }
 
   Widget _cellPadding({required Widget child, bool highlight = false}) {
-    return Container(
-      color: highlight ? ClayTokens.accent.withValues(alpha: 0.06) : null,
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+    final m = context._sheetMetrics;
+    final cell = Container(
+      color: highlight ? ClayTokens.accent.withValues(alpha: 0.12) : null,
+      padding: EdgeInsets.symmetric(horizontal: 2, vertical: m.cellOuterV),
+      alignment: Alignment.center,
       child: child,
     );
+    if (m.rowHeight == null) return cell;
+    return SizedBox(height: m.rowHeight, child: cell);
   }
 
   TableRow _buildDataRow(int index, _ExpenseRowData row) {
     final editable = widget.canEdit && !row.isSaving;
-    final highlight = row.isDraft || row.isDirty;
+    final highlight = _isRowEditing(row, index);
+    void activateRow() => _setFocusedRow(index);
 
     return TableRow(
-      decoration: row.isRecurringTemplate && !row.isDraft
-          ? BoxDecoration(
-              color: ClayTokens.tertiary.withValues(alpha: 0.04),
-            )
-          : null,
+      decoration: _rowDecoration(row, index),
       children: [
         _cellPadding(
           highlight: highlight,
@@ -544,6 +714,7 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
             enabled: editable,
             value: row.description,
             hint: 'Descrição',
+            onActivate: activateRow,
             onCommit: (v) => _updateRow(
               index,
               (current) => current.copyWith(description: v),
@@ -556,6 +727,7 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
           child: _AmountCell(
             enabled: editable,
             value: row.amount,
+            onActivate: activateRow,
             onCommit: (v) => _updateRow(
               index,
               (current) => current.copyWith(amount: v),
@@ -568,6 +740,7 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
           child: _DateCell(
             enabled: editable,
             date: row.referenceDate,
+            onActivate: activateRow,
             onTap: () => _pickDate(
               initial: row.referenceDate,
               onPicked: (d) => _updateRow(
@@ -583,6 +756,7 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
             enabled: editable,
             date: row.dueDate,
             placeholder: '—',
+            onActivate: activateRow,
             onTap: () => _pickDate(
               initial: row.dueDate ?? row.referenceDate,
               onPicked: (d) => _updateRow(
@@ -608,47 +782,52 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
                         (current) => current.copyWith(recurrenceDay: d),
                       ),
                 )
-              : const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                  child: Text('—', style: TextStyle(color: ClayTokens.textMuted)),
+              : Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
+                  child: Text('—', style: TextStyle(fontSize: context._sheetMetrics.fontSize, color: ClayTokens.textMuted)),
                 ),
         ),
         _cellPadding(
           highlight: highlight,
           child: Center(
             child: row.isSaving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                ? SizedBox(
+                    width: context._sheetMetrics.spinner,
+                    height: context._sheetMetrics.spinner,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Checkbox(
-                    value: row.isPaid,
-                    onChanged: editable
-                        ? (v) => _updateRow(
-                              index,
-                              (current) => current.copyWith(isPaid: v ?? false),
-                            )
-                        : null,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
+                : SizedBox(
+                    width: context._sheetMetrics.checkbox,
+                    height: context._sheetMetrics.checkbox,
+                    child: Checkbox(
+                      value: row.isPaid,
+                      onChanged: editable
+                          ? (v) => _updateRow(
+                                index,
+                                (current) => current.copyWith(isPaid: v ?? false),
+                              )
+                          : null,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
           ),
         ),
         _cellPadding(
+          highlight: highlight,
           child: Center(
             child: row.isSaving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                ? SizedBox(
+                    width: context._sheetMetrics.actionSpinner,
+                    height: context._sheetMetrics.actionSpinner,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (editable && (row.isDraft || row.isDirty))
                         IconButton(
-                          icon: const Icon(Icons.save_rounded, size: 18),
+                          icon: Icon(Icons.save_rounded, size: context._sheetMetrics.actionIconSize),
                           tooltip: 'Salvar linha',
                           onPressed: () => _saveRow(
                             index,
@@ -657,41 +836,41 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
                             quiet: false,
                           ),
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 28,
-                            minHeight: 28,
+                          constraints: BoxConstraints(
+                            minWidth: context._sheetMetrics.actionBtn,
+                            minHeight: context._sheetMetrics.actionBtn,
                           ),
                         ),
                       if (row.isDraft)
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 18),
+                          icon: Icon(Icons.close_rounded, size: context._sheetMetrics.actionIconSize),
                           tooltip: 'Remover rascunho',
                           onPressed: editable ? () => setState(() => _rows.removeAt(index)) : null,
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 28,
-                            minHeight: 28,
+                          constraints: BoxConstraints(
+                            minWidth: context._sheetMetrics.actionBtn,
+                            minHeight: context._sheetMetrics.actionBtn,
                           ),
                         )
                       else ...[
                         IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                          icon: Icon(Icons.delete_outline_rounded, size: context._sheetMetrics.actionIconSize),
                           tooltip: 'Excluir despesa',
                           onPressed: editable ? () => _deleteRow(index) : null,
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 28,
-                            minHeight: 28,
+                          constraints: BoxConstraints(
+                            minWidth: context._sheetMetrics.actionBtn,
+                            minHeight: context._sheetMetrics.actionBtn,
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                          icon: Icon(Icons.open_in_new_rounded, size: context._sheetMetrics.actionIconSize),
                           tooltip: 'Detalhes / rateio',
                           onPressed: () => context.go('/rental/expenses/${row.expenseId}'),
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 28,
-                            minHeight: 28,
+                          constraints: BoxConstraints(
+                            minWidth: context._sheetMetrics.actionBtn,
+                            minHeight: context._sheetMetrics.actionBtn,
                           ),
                         ),
                       ],
@@ -705,6 +884,10 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
 
   @override
   Widget build(BuildContext context) {
+    final metrics = SpreadsheetRowMetrics.resolve(context);
+    final rowCountLabel = metrics.rowHeight != null
+        ? '${_rows.length} ${_rows.length == 1 ? 'linha' : 'linhas'}'
+        : '${_rows.length} linha(s) · Enter ou sair do campo para salvar · use o ícone de salvar';
     final scrollbarTheme = ScrollbarTheme.of(context).copyWith(
       thumbVisibility: WidgetStateProperty.all(true),
       trackVisibility: WidgetStateProperty.all(true),
@@ -729,7 +912,7 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
           7: FixedColumnWidth(108),
           8: FixedColumnWidth(118),
           9: FixedColumnWidth(52),
-          10: FixedColumnWidth(112),
+          10: FixedColumnWidth(146),
         },
         children: [
           TableRow(
@@ -754,12 +937,12 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
                 11,
                 (i) => i == 0
                     ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 28),
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: context._sheetMetrics.emptyPadV),
                         child: Text(
                           widget.canEdit
                               ? 'Nenhuma despesa. Clique em + Adicionar linha.'
                               : 'Nenhuma despesa cadastrada.',
-                          style: const TextStyle(color: ClayTokens.textMuted, fontSize: 13),
+                          style: TextStyle(color: ClayTokens.textMuted, fontSize: 13),
                         ),
                       )
                     : const SizedBox.shrink(),
@@ -771,12 +954,14 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
       ),
     );
 
-    return Column(
+    return _SpreadsheetRowMetricsScope(
+      metrics: metrics,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+            padding: EdgeInsets.fromLTRB(metrics == SpreadsheetRowMetrics.mobile ? 8 : 20, 0, metrics == SpreadsheetRowMetrics.mobile ? 8 : 20, 0),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final viewportWidth = constraints.maxWidth;
@@ -828,14 +1013,14 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
                         ),
                       ),
                       if (needsHorizontalScroll) ...[
-                        const SizedBox(height: 6),
+                        SizedBox(height: 6),
                         _SpreadsheetHorizontalScrollbar(
                           controller: _horizontalScrollController,
                           contentWidth: _tableWidth,
                           viewportWidth: viewportWidth,
                         ),
                       ],
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                     ],
                   ),
                 );
@@ -843,9 +1028,9 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
             ),
           ),
         ),
-        if (widget.canEdit)
+        if (widget.canEdit && widget.showAddRowButton)
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
             child: Row(
               children: [
                 Material(
@@ -854,7 +1039,7 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
                   child: InkWell(
                     onTap: _addDraftRow,
                     borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -870,15 +1055,24 @@ class _RentalExpensesSpreadsheetState extends ConsumerState<RentalExpensesSpread
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Text(
-                  '${_rows.length} linha(s) · Enter ou sair do campo para salvar · use o ícone de salvar',
-                  style: const TextStyle(color: ClayTokens.textMuted, fontSize: 12),
+                  rowCountLabel,
+                  style: TextStyle(color: ClayTokens.textMuted, fontSize: 12),
                 ),
               ],
             ),
           ),
+        if (widget.canEdit && !widget.showAddRowButton)
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Text(
+              rowCountLabel,
+              style: TextStyle(color: ClayTokens.textMuted, fontSize: 12),
+            ),
+          ),
       ],
+    ),
     );
   }
 }
@@ -1056,6 +1250,11 @@ class _ExpenseRowData {
   }
 }
 
+class _DropdownSelection<T> {
+  const _DropdownSelection(this.value);
+  final T? value;
+}
+
 class _SpreadsheetDropdown<T> extends StatelessWidget {
   const _SpreadsheetDropdown({
     required this.enabled,
@@ -1086,40 +1285,142 @@ class _SpreadsheetDropdown<T> extends StatelessWidget {
     return null;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<T>(
-        isExpanded: true,
-        isDense: true,
-        menuMaxHeight: 280,
-        borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
-        dropdownColor: ClayTokens.surfaceRaised,
-        elevation: 12,
-        icon: const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          size: 18,
-          color: ClayTokens.muted,
-        ),
-        value: _resolveValue(),
-        hint: Text(hint ?? '—', style: const TextStyle(fontSize: 12, color: ClayTokens.textMuted)),
-        items: items
-            .map(
-              (item) => DropdownMenuItem(
-                value: item,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Text(
-                    itemLabel(item),
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
+  double _menuWidthForItems(BuildContext context, RenderBox anchor, Offset origin) {
+    const menuPad = _dropdownMenuItemPadH * 2 + 12;
+    final textStyle = TextStyle(
+      fontSize: _dropdownMenuFontSize,
+      fontWeight: FontWeight.w700,
+    );
+    final textDirection = Directionality.of(context);
+
+    var maxTextWidth = 0.0;
+    for (final item in items) {
+      final painter = TextPainter(
+        text: TextSpan(text: itemLabel(item), style: textStyle),
+        maxLines: 1,
+        textDirection: textDirection,
+      )..layout();
+      maxTextWidth = math.max(maxTextWidth, painter.width);
+    }
+
+    final overlaySize = Overlay.of(context).context.size ?? MediaQuery.sizeOf(context);
+    final maxAvailable = overlaySize.width - origin.dx - 8;
+
+    return math.max(anchor.size.width, maxTextWidth + menuPad).clamp(
+          anchor.size.width,
+          math.max(anchor.size.width, maxAvailable),
+        );
+  }
+
+  double _menuLeft(double originX, double menuWidth, BuildContext context) {
+    final overlayWidth = Overlay.of(context).context.size?.width ?? MediaQuery.sizeOf(context).width;
+    if (originX + menuWidth <= overlayWidth - 8) return originX;
+    return math.max(8, overlayWidth - menuWidth - 8);
+  }
+
+  Future<void> _openMenu(BuildContext context, RenderBox anchor) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final origin = anchor.localToGlobal(Offset.zero, ancestor: overlay);
+    final menuWidth = _menuWidthForItems(context, anchor, origin);
+    final menuLeft = _menuLeft(origin.dx, menuWidth, context);
+    final resolved = _resolveValue();
+
+    final picked = await showGeneralDialog<_DropdownSelection<T>>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Fechar lista',
+      barrierColor: Colors.transparent,
+      transitionDuration: Duration.zero,
+      pageBuilder: (dialogContext, _, _) {
+        return Stack(
+          children: [
+            Positioned(
+              left: menuLeft,
+              top: origin.dy + anchor.size.height + 2,
+              width: menuWidth,
+              child: Material(
+                elevation: 8,
+                color: ClayTokens.surfaceRaised,
+                borderRadius: BorderRadius.circular(_dropdownRadius),
+                clipBehavior: Clip.antiAlias,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: _dropdownMenuMaxHeight),
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    children: items.map((item) {
+                      final selected = item == resolved;
+                      return InkWell(
+                        onTap: () => Navigator.of(dialogContext).pop(_DropdownSelection(item)),
+                        child: Container(
+                          height: context._sheetMetrics.dropdownMenuItemHeight,
+                          padding: EdgeInsets.symmetric(horizontal: _dropdownMenuItemPadH),
+                          alignment: Alignment.centerLeft,
+                          color: selected
+                              ? ClayTokens.accentSurface.withValues(alpha: 0.65)
+                              : null,
+                          child: Text(
+                            itemLabel(item),
+                            style: TextStyle(
+                              fontSize: _dropdownMenuFontSize,
+                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                              color: ClayTokens.textPrimary,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),
-            )
-            .toList(),
-        onChanged: enabled ? onChanged : null,
-      ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (picked != null) onChanged(picked.value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = _resolveValue();
+    final label = resolved != null ? itemLabel(resolved) : (hint ?? '—');
+
+    return Builder(
+      builder: (fieldContext) {
+        return InkWell(
+          onTap: !enabled
+              ? null
+              : () {
+                  final box = fieldContext.findRenderObject() as RenderBox?;
+                  if (box == null) return;
+                  _openMenu(fieldContext, box);
+                },
+          borderRadius: BorderRadius.circular(ClayTokens.radiusXs),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 2),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: context._sheetMetrics.fontSize, fontWeight: FontWeight.w600, color: resolved != null ? ClayTokens.textPrimary : ClayTokens.textMuted),
+                  ),
+                ),
+                if (enabled)
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: _dropdownIconSize,
+                    color: ClayTokens.muted,
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1161,15 +1462,15 @@ class _CondoDropdown extends StatelessWidget {
     final resolved = _resolveValue();
     if (!enabled) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
         child: Text(
           resolved?.name ?? fallbackName ?? '—',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: context._sheetMetrics.fontSize, fontWeight: FontWeight.w600),
         ),
       );
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: EdgeInsets.symmetric(horizontal: 4),
       child: _SpreadsheetDropdown<Condominium>(
         enabled: enabled,
         value: resolved,
@@ -1244,25 +1545,24 @@ class _LocationDropdown extends ConsumerWidget {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) {
-        final maxHeight = MediaQuery.sizeOf(ctx).height * 0.7;
+        final maxHeight = MediaQuery.sizeOf(ctx).height * 0.49;
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                padding: EdgeInsets.fromLTRB(14, 2, 14, 2),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'Destino da despesa',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(height: 4),
                     Text(
                       '${sortedBlocks.length} bloco(s)/torre(s) · ${sortedProperties.length} imóvel(is)',
-                      style: const TextStyle(fontSize: 12, color: ClayTokens.textMuted),
+                      style: TextStyle(fontSize: 8, color: ClayTokens.textMuted),
                     ),
                   ],
                 ),
@@ -1301,11 +1601,10 @@ class _LocationDropdown extends ConsumerWidget {
                         ),
                       ),
                     if (selected.kind != RentalExpenseLocationKind.condominium &&
-                        !_isInLists(selected, sortedBlocks, sortedProperties))
-                      ...[
-                        _locationSectionHeader('Selecionado'),
-                        _locationTile(ctx, selected, selected),
-                      ],
+                        !_isInLists(selected, sortedBlocks, sortedProperties)) ...[
+                      _locationSectionHeader('Selecionado'),
+                      _locationTile(ctx, selected, selected),
+                    ],
                   ],
                 ),
               ),
@@ -1334,14 +1633,14 @@ class _LocationDropdown extends ConsumerWidget {
 
   Widget _locationSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      padding: EdgeInsets.fromLTRB(14, 8, 14, 3),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 11,
+        style: TextStyle(
+          fontSize: 8,
           fontWeight: FontWeight.w700,
           color: ClayTokens.textSecondary,
-          letterSpacing: 0.3,
+          letterSpacing: 0.2,
         ),
       ),
     );
@@ -1355,16 +1654,19 @@ class _LocationDropdown extends ConsumerWidget {
     final isSelected = option == selected;
     return ListTile(
       dense: true,
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -4),
+      minVerticalPadding: 0,
+      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 0),
       selected: isSelected,
       title: Text(
         option.dropdownLabel,
         style: TextStyle(
-          fontSize: 13,
+          fontSize: 9,
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check_rounded, color: ClayTokens.accent, size: 20)
+          ? Icon(Icons.check_rounded, color: ClayTokens.accent, size: 14)
           : null,
       onTap: () => Navigator.pop(context, option),
     );
@@ -1373,11 +1675,11 @@ class _LocationDropdown extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (condominiumId == null) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
         child: Text(
           'Selecione o condomínio',
-          style: TextStyle(color: ClayTokens.textMuted, fontSize: 11),
+          style: TextStyle(fontSize: context._sheetMetrics.fontSize, color: ClayTokens.textMuted),
         ),
       );
     }
@@ -1386,15 +1688,15 @@ class _LocationDropdown extends ConsumerWidget {
     final blocksAsync = ref.watch(condominiumBlocksProvider(condominiumId!));
 
     if (propertiesAsync.isLoading || blocksAsync.isLoading) {
-      return const Padding(
-        padding: EdgeInsets.all(8),
-        child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+      return Padding(
+        padding: EdgeInsets.all(4),
+        child: SizedBox(width: context._sheetMetrics.spinner, height: context._sheetMetrics.spinner, child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
 
     if (propertiesAsync.hasError || blocksAsync.hasError) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: 4, vertical: context._sheetMetrics.padVSm),
         child: Material(
           color: ClayTokens.error.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
@@ -1404,11 +1706,11 @@ class _LocationDropdown extends ConsumerWidget {
               ref.invalidate(condominiumBlocksProvider(condominiumId!));
             },
             borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
               child: Text(
                 'Erro ao carregar · toque para tentar',
-                style: TextStyle(color: ClayTokens.error, fontSize: 11),
+                style: TextStyle(fontSize: context._sheetMetrics.fontSize, color: ClayTokens.error),
               ),
             ),
           ),
@@ -1419,45 +1721,30 @@ class _LocationDropdown extends ConsumerWidget {
     final properties = propertiesAsync.value ?? const <RentalProperty>[];
     final blocks = blocksAsync.value ?? const <CondominiumBlock>[];
     final resolved = _resolveValue(_buildOptions(blocks, properties, value), value);
-    final summary = '${blocks.length} bloco(s) · ${properties.length} imóvel(is)';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: EdgeInsets.symmetric(horizontal: 4),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: enabled ? () => _openPicker(context, blocks, properties, resolved) : null,
           borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: 6, vertical: context._sheetMetrics.padVSm),
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        resolved.dropdownLabel,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: enabled ? ClayTokens.textPrimary : ClayTokens.textSecondary,
-                        ),
-                      ),
-                      if (enabled)
-                        Text(
-                          summary,
-                          style: const TextStyle(fontSize: 10, color: ClayTokens.textMuted),
-                        ),
-                    ],
+                  child: Text(
+                    resolved.dropdownLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: context._sheetMetrics.fontSize, fontWeight: FontWeight.w600, color: enabled ? ClayTokens.textPrimary : ClayTokens.textSecondary),
                   ),
                 ),
                 if (enabled)
-                  const Icon(
+                  Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    size: 18,
+                    size: _dropdownIconSize,
                     color: ClayTokens.muted,
                   ),
               ],
@@ -1477,10 +1764,10 @@ class _LocationEmptyHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       child: Text(
         message,
-        style: const TextStyle(fontSize: 12, color: ClayTokens.textMuted, fontStyle: FontStyle.italic),
+        style: TextStyle(fontSize: 8, color: ClayTokens.textMuted, fontStyle: FontStyle.italic),
       ),
     );
   }
@@ -1500,7 +1787,7 @@ class _EntryTypeDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: EdgeInsets.symmetric(horizontal: 4),
       child: _SpreadsheetDropdown<RentalExpenseEntryType>(
         enabled: enabled,
         value: value,
@@ -1533,7 +1820,7 @@ class _CategoryCell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return switch (row.entryType) {
       RentalExpenseEntryType.fixedBill => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: 4),
           child: _SpreadsheetDropdown<CondominiumBillType>(
             enabled: enabled,
             value: row.billType,
@@ -1551,7 +1838,7 @@ class _CategoryCell extends ConsumerWidget {
           ),
         ),
       RentalExpenseEntryType.service => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: 4),
           child: _SpreadsheetDropdown<ServiceType>(
             enabled: enabled,
             value: row.serviceType,
@@ -1596,17 +1883,17 @@ class _MaterialCategoryDropdown extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (condominiumId == null) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        child: Text('—', style: TextStyle(color: ClayTokens.textMuted, fontSize: 12)),
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
+        child: Text('—', style: TextStyle(fontSize: context._sheetMetrics.fontSize, color: ClayTokens.textMuted)),
       );
     }
 
     final categoriesAsync = ref.watch(materialCategoriesProvider(condominiumId!));
     return categoriesAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(8),
-        child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+      loading: () => Padding(
+        padding: EdgeInsets.all(4),
+        child: SizedBox(width: context._sheetMetrics.spinner, height: context._sheetMetrics.spinner, child: CircularProgressIndicator(strokeWidth: 2)),
       ),
       error: (_, _) => const SizedBox.shrink(),
       data: (categories) {
@@ -1619,12 +1906,12 @@ class _MaterialCategoryDropdown extends ConsumerWidget {
         }
         if (selected == null && categoryId != null && fallbackLabel != null) {
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            child: Text(fallbackLabel!, style: const TextStyle(fontSize: 12)),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
+            child: Text(fallbackLabel!, style: TextStyle(fontSize: context._sheetMetrics.fontSize)),
           );
         }
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: 4),
           child: _SpreadsheetDropdown<mat.MaterialCategory>(
             enabled: enabled,
             value: selected,
@@ -1645,12 +1932,14 @@ class _TextCell extends StatefulWidget {
     required this.value,
     required this.hint,
     required this.onCommit,
+    this.onActivate,
   });
 
   final bool enabled;
   final String value;
   final String hint;
   final ValueChanged<String> onCommit;
+  final VoidCallback? onActivate;
 
   @override
   State<_TextCell> createState() => _TextCellState();
@@ -1669,7 +1958,9 @@ class _TextCellState extends State<_TextCell> {
   }
 
   void _onFocusChange() {
-    if (!_focusNode.hasFocus) {
+    if (_focusNode.hasFocus) {
+      widget.onActivate?.call();
+    } else {
       widget.onCommit(_controller.text);
     }
   }
@@ -1690,12 +1981,84 @@ class _TextCellState extends State<_TextCell> {
     super.dispose();
   }
 
+  bool _isMobile(BuildContext context) => context._sheetMetrics.rowHeight != null;
+
+  Future<void> _openEditSheet() async {
+    widget.onActivate?.call();
+    final sheetController = TextEditingController(text: _controller.text);
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: ClayTokens.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(ClayTokens.radiusLg)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Descrição',
+                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 16),
+                ClayTextField(
+                  controller: sheetController,
+                  hint: widget.hint,
+                  maxLines: 4,
+                  pill: false,
+                ),
+                const SizedBox(height: 16),
+                ClayButton(
+                  label: 'Salvar',
+                  icon: Icons.check_rounded,
+                  onPressed: () => Navigator.of(sheetContext).pop(sheetController.text),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    sheetController.dispose();
+    if (!mounted || result == null) return;
+    _controller.text = result;
+    widget.onCommit(result);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        child: Text(widget.value, style: const TextStyle(fontSize: 12)),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
+        child: Text(widget.value, style: TextStyle(fontSize: context._sheetMetrics.fontSize)),
+      );
+    }
+    if (_isMobile(context)) {
+      final isPlaceholder = widget.value.isEmpty;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _openEditSheet,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
+            child: Text(
+              isPlaceholder ? widget.hint : widget.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: context._sheetMetrics.fontSize,
+                color: isPlaceholder ? ClayTokens.textMuted : ClayTokens.textPrimary,
+              ),
+            ),
+          ),
+        ),
       );
     }
     return TextField(
@@ -1705,15 +2068,16 @@ class _TextCellState extends State<_TextCell> {
         hintText: widget.hint,
         border: InputBorder.none,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
       ),
-      style: const TextStyle(fontSize: 12),
+      style: TextStyle(fontSize: context._sheetMetrics.fontSize),
       textInputAction: TextInputAction.done,
       onEditingComplete: () {
         widget.onCommit(_controller.text);
         _focusNode.unfocus();
       },
       onSubmitted: widget.onCommit,
+      onTap: () => widget.onActivate?.call(),
       onTapOutside: (_) {
         widget.onCommit(_controller.text);
         _focusNode.unfocus();
@@ -1727,11 +2091,13 @@ class _AmountCell extends StatefulWidget {
     required this.enabled,
     required this.value,
     required this.onCommit,
+    this.onActivate,
   });
 
   final bool enabled;
   final double value;
   final ValueChanged<double> onCommit;
+  final VoidCallback? onActivate;
 
   @override
   State<_AmountCell> createState() => _AmountCellState();
@@ -1752,7 +2118,9 @@ class _AmountCellState extends State<_AmountCell> {
   }
 
   void _onFocusChange() {
-    if (!_focusNode.hasFocus) {
+    if (_focusNode.hasFocus) {
+      widget.onActivate?.call();
+    } else {
       widget.onCommit(_parse(_controller.text));
     }
   }
@@ -1776,15 +2144,94 @@ class _AmountCellState extends State<_AmountCell> {
 
   void _commit() => widget.onCommit(_parse(_controller.text));
 
+  bool _isMobile(BuildContext context) => context._sheetMetrics.rowHeight != null;
+
+  Future<void> _openEditSheet() async {
+    widget.onActivate?.call();
+    final sheetController = TextEditingController(text: _controller.text);
+    final result = await showModalBottomSheet<double>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: ClayTokens.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(ClayTokens.radiusLg)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Valor',
+                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 16),
+                ClayTextField(
+                  controller: sheetController,
+                  hint: '0,00',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
+                  pill: false,
+                ),
+                const SizedBox(height: 16),
+                ClayButton(
+                  label: 'Salvar',
+                  icon: Icons.check_rounded,
+                  onPressed: () => Navigator.of(sheetContext).pop(_parse(sheetController.text)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    sheetController.dispose();
+    if (!mounted || result == null) return;
+    final next = result > 0 ? result.toStringAsFixed(2) : '';
+    _controller.text = next;
+    widget.onCommit(result);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
         child: Text(
           widget.value > 0 ? _spreadsheetCurrency.format(widget.value) : '—',
           textAlign: TextAlign.right,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: context._sheetMetrics.fontSize, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+    if (_isMobile(context)) {
+      final isPlaceholder = widget.value <= 0;
+      final label = isPlaceholder
+          ? '0,00'
+          : _spreadsheetCurrency.format(widget.value);
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _openEditSheet,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
+            child: Text(
+              label,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: context._sheetMetrics.fontSize,
+                fontWeight: FontWeight.w600,
+                color: isPlaceholder ? ClayTokens.textMuted : ClayTokens.textPrimary,
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -1794,19 +2241,20 @@ class _AmountCellState extends State<_AmountCell> {
       textAlign: TextAlign.right,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         hintText: '0,00',
         border: InputBorder.none,
         isDense: true,
-        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
       ),
-      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      style: TextStyle(fontSize: context._sheetMetrics.fontSize, fontWeight: FontWeight.w600),
       textInputAction: TextInputAction.done,
       onEditingComplete: () {
         _commit();
         _focusNode.unfocus();
       },
       onSubmitted: (_) => _commit(),
+      onTap: () => widget.onActivate?.call(),
       onTapOutside: (_) {
         _commit();
         _focusNode.unfocus();
@@ -1821,12 +2269,14 @@ class _DateCell extends StatelessWidget {
     required this.date,
     required this.onTap,
     this.placeholder = 'dd/mm/aaaa',
+    this.onActivate,
   });
 
   final bool enabled;
   final DateTime? date;
   final VoidCallback onTap;
   final String placeholder;
+  final VoidCallback? onActivate;
 
   @override
   Widget build(BuildContext context) {
@@ -1834,15 +2284,17 @@ class _DateCell extends StatelessWidget {
         ? _spreadsheetDateFmt.format(date!)
         : placeholder;
     return InkWell(
-      onTap: enabled ? onTap : null,
+      onTap: enabled
+          ? () {
+              onActivate?.call();
+              onTap();
+            }
+          : null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: context._sheetMetrics.fieldPadV),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: date != null ? ClayTokens.textPrimary : ClayTokens.textMuted,
-          ),
+          style: TextStyle(fontSize: context._sheetMetrics.fontSize, color: date != null ? ClayTokens.textPrimary : ClayTokens.textMuted),
         ),
       ),
     );
@@ -1867,34 +2319,40 @@ class _RecurrenceCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          SizedBox(
-            width: 28,
-            height: 28,
-            child: Checkbox(
-              value: isTemplate,
-              onChanged: enabled ? (v) => onTemplateChanged(v ?? false) : null,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            ),
+          Checkbox(
+            value: isTemplate,
+            onChanged: enabled ? (v) => onTemplateChanged(v ?? false) : null,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
           ),
+          const SizedBox(width: 6),
           if (isTemplate)
             Expanded(
-              child: _SpreadsheetDropdown<int>(
-                enabled: enabled,
-                value: day,
-                items: List.generate(28, (i) => i + 1),
-                itemLabel: (d) => 'Dia $d',
-                onChanged: (v) {
-                  if (v != null) onDayChanged(v);
-                },
+              child: Padding(
+                padding: EdgeInsets.only(left: 2),
+                child: _SpreadsheetDropdown<int>(
+                  enabled: enabled,
+                  value: day,
+                  items: List.generate(28, (i) => i + 1),
+                  itemLabel: (d) => 'Dia $d',
+                  onChanged: (v) {
+                    if (v != null) onDayChanged(v);
+                  },
+                ),
               ),
             )
           else
-            const Expanded(
-              child: Text('—', style: TextStyle(fontSize: 11, color: ClayTokens.textMuted)),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: Text(
+                  '—',
+                  style: TextStyle(fontSize: context._sheetMetrics.fontSize, color: ClayTokens.textMuted),
+                ),
+              ),
             ),
         ],
       ),

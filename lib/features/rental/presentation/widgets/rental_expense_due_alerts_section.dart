@@ -38,25 +38,30 @@ class RentalExpenseDueAlertsSection extends ConsumerWidget {
             if (dueSoon > 0) '$dueSoon vencendo',
             if (generate > 0) '$generate a gerar',
           ].join(' · ');
+          final iconSize = compact ? 12.0 : 16.0;
+          final fontSize = compact ? 8.0 : 11.0;
+          final hPad = compact ? 7.0 : 10.0;
+          final vPad = compact ? 4.0 : 6.0;
+          final gap = compact ? 4.0 : 6.0;
           return Tooltip(
             message: summary.isEmpty ? '${alerts.length} alerta(s)' : summary,
             child: ClaySurface(
               depth: ClayDepth.pressed,
               onTap: () {},
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.notifications_active_rounded,
-                    size: 16,
+                    size: iconSize,
                     color: overdue > 0 ? ClayTokens.error : ClayTokens.warning,
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: gap),
                   Text(
                     summary.isEmpty ? '${alerts.length}' : summary,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: fontSize,
                       fontWeight: FontWeight.w700,
                       color: overdue > 0 ? ClayTokens.error : ClayTokens.warning,
                     ),

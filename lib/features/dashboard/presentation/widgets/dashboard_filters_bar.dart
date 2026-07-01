@@ -1,7 +1,7 @@
-import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
 import 'package:cond_manager/features/dashboard/domain/dashboard_filter.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
+import 'package:cond_manager/shared/widgets/form/filter_carousel_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -11,11 +11,13 @@ class DashboardFiltersBar extends StatelessWidget {
     required this.filter,
     required this.condominiums,
     required this.onChanged,
+    this.compact = false,
   });
 
   final DashboardFilter filter;
   final List<Condominium> condominiums;
   final ValueChanged<DashboardFilter> onChanged;
+  final bool compact;
 
   static final _yearFmt = DateFormat('yyyy');
   static final _dayFmt = DateFormat('dd/MM/yyyy');
@@ -27,53 +29,49 @@ class DashboardFiltersBar extends StatelessWidget {
 
     return ClaySurface(
       depth: ClayDepth.raised,
-      radius: ClayTokens.radiusMd,
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Filtros',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: ClayTokens.primary,
-                ),
-          ),
-          const SizedBox(height: 10),
-          if (condominiums.length > 1) ...[
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _FilterChip(
-                    label: 'Todos condomínios',
-                    selected: filter.condominiumId == null,
-                    onTap: () => onChanged(filter.copyWith(clearCondominium: true)),
-                  ),
-                  ...condominiums.map(
-                    (c) => Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: _FilterChip(
-                        label: c.name,
-                        selected: filter.condominiumId == c.id,
-                        onTap: () => onChanged(filter.copyWith(condominiumId: c.id)),
+      radius: compact ? ClayTokens.radiusSm : ClayTokens.radiusMd,
+      padding: EdgeInsets.all(compact ? 8 : 14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final useCarousel = constraints.maxWidth < FilterCarouselLayout.mobileBreakpoint;
+
+          final condoRow = condominiums.length > 1
+              ? SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'Todos condomínios',
+                        selected: filter.condominiumId == null,
+                        onTap: () => onChanged(filter.copyWith(clearCondominium: true)),
+                        compact: compact,
                       ),
-                    ),
+                      ...condominiums.map(
+                        (c) => Padding(
+                          padding: EdgeInsets.only(left: compact ? 4 : 8),
+                          child: _FilterChip(
+                            label: c.name,
+                            selected: filter.condominiumId == c.id,
+                            onTap: () => onChanged(filter.copyWith(condominiumId: c.id)),
+                            compact: compact,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          SingleChildScrollView(
+                )
+              : null;
+
+          final periodRow = SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: DashboardPeriodType.values.map((p) {
                 return Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: EdgeInsets.only(right: compact ? 4 : 8),
                   child: _FilterChip(
                     label: p.label,
                     selected: filter.period == p,
+                    compact: compact,
                     onTap: () {
                       final now = DateTime.now();
                       onChanged(
@@ -88,25 +86,72 @@ class DashboardFiltersBar extends StatelessWidget {
                 );
               }).toList(),
             ),
-          ),
-          const SizedBox(height: 12),
-          _PeriodNavigator(
-            filter: filter,
-            years: years,
-            onChanged: onChanged,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            filter.periodDescription(
-              condominiumName: _condoName(filter.condominiumId),
-            ),
-            style: const TextStyle(
-              fontSize: 12,
-              color: ClayTokens.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+          );
+
+          final navigatorBlock = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _PeriodNavigator(
+                filter: filter,
+                years: years,
+                onChanged: onChanged,
+                compact: compact,
+              ),
+              if (!compact) ...[
+                const SizedBox(height: 8),
+                Text(
+                  filter.periodDescription(
+                    condominiumName: _condoName(filter.condominiumId),
+                  ),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: ClayTokens.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          );
+
+          final filterBody = useCarousel
+              ? FilterCarouselLayout(
+                  items: [
+                    if (condoRow != null) condoRow,
+                    periodRow,
+                    navigatorBlock,
+                  ],
+                  itemHeight: compact ? 64 : 88,
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (condoRow != null) ...[
+                      condoRow,
+                      SizedBox(height: compact ? 6 : 12),
+                    ],
+                    periodRow,
+                    SizedBox(height: compact ? 6 : 12),
+                    navigatorBlock,
+                  ],
+                );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!compact)
+                Text(
+                  'Filtros',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: ClayTokens.primary,
+                      ),
+                ),
+              if (!compact) const SizedBox(height: 10),
+              filterBody,
+            ],
+          );
+        },
       ),
     );
   }
@@ -125,19 +170,24 @@ class _PeriodNavigator extends StatelessWidget {
     required this.filter,
     required this.years,
     required this.onChanged,
+    this.compact = false,
   });
 
   final DashboardFilter filter;
   final List<int> years;
   final ValueChanged<DashboardFilter> onChanged;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     if (filter.period == DashboardPeriodType.year) {
       return Row(
         children: [
-          const Text('Ano:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-          const SizedBox(width: 10),
+          Text(
+            'Ano:',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: compact ? 10 : 13),
+          ),
+          SizedBox(width: compact ? 6 : 10),
           Expanded(
             child: DropdownButtonFormField<int>(
               initialValue: filter.effectiveYear,
@@ -145,9 +195,13 @@ class _PeriodNavigator extends StatelessWidget {
               dropdownColor: Theme.of(context).colorScheme.surface,
               elevation: 12,
               menuMaxHeight: 320,
-              decoration: const InputDecoration(
+              style: TextStyle(fontSize: compact ? 11 : 14),
+              decoration: InputDecoration(
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: compact ? 8 : 12,
+                  vertical: compact ? 4 : 10,
+                ),
               ),
               items: years
                   .map(
@@ -172,34 +226,46 @@ class _PeriodNavigator extends StatelessWidget {
         IconButton(
           tooltip: 'Período anterior',
           onPressed: () => onChanged(_shift(filter, -1)),
-          icon: const Icon(Icons.chevron_left_rounded),
+          icon: Icon(Icons.chevron_left_rounded, size: compact ? 18 : 24),
+          padding: compact ? EdgeInsets.zero : null,
+          constraints: compact ? const BoxConstraints(minWidth: 28, minHeight: 28) : null,
         ),
         Expanded(
           child: OutlinedButton.icon(
             onPressed: () => _pickDate(context),
-            icon: const Icon(Icons.calendar_today_rounded, size: 18),
+            icon: Icon(Icons.calendar_today_rounded, size: compact ? 14 : 18),
             label: Text(
               _periodLabel(filter),
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: compact ? 10 : 14),
             ),
+            style: compact
+                ? OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  )
+                : null,
           ),
         ),
         IconButton(
           tooltip: 'Próximo período',
           onPressed: () => onChanged(_shift(filter, 1)),
-          icon: const Icon(Icons.chevron_right_rounded),
+          icon: Icon(Icons.chevron_right_rounded, size: compact ? 18 : 24),
+          padding: compact ? EdgeInsets.zero : null,
+          constraints: compact ? const BoxConstraints(minWidth: 28, minHeight: 28) : null,
         ),
-        TextButton(
-          onPressed: () {
-            final now = DateTime.now();
-            onChanged(
-              filter.copyWith(
-                anchorDate: DateTime(now.year, now.month, now.day),
-              ),
-            );
-          },
-          child: const Text('Hoje'),
-        ),
+        if (!compact)
+          TextButton(
+            onPressed: () {
+              final now = DateTime.now();
+              onChanged(
+                filter.copyWith(
+                  anchorDate: DateTime(now.year, now.month, now.day),
+                ),
+              );
+            },
+            child: const Text('Hoje'),
+          ),
       ],
     );
   }
@@ -265,11 +331,13 @@ class _FilterChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.compact = false,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -282,13 +350,17 @@ class _FilterChip extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(ClayTokens.radiusFull),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 8 : 14,
+            vertical: compact ? 4 : 8,
+          ),
           child: Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? ClayTokens.primary : ClayTokens.textSecondary,
-                ),
+            style: TextStyle(
+              fontSize: compact ? 10 : 13,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? ClayTokens.primary : ClayTokens.textSecondary,
+            ),
           ),
         ),
       ),

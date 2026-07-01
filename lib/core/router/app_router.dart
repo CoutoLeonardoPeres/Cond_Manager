@@ -64,8 +64,22 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
     refreshListenable: refresh,
+    errorBuilder: (context, state) => Scaffold(
+      backgroundColor: const Color(0xFFE8F4F2),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Rota não encontrada: ${state.uri.path}',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    ),
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);
+      if (authState.isLoading) return null;
+
       final isLoggedIn = authState.value?.session != null;
       final path = state.uri.path;
       final isAuthRoute = path.startsWith('/login') ||
@@ -78,7 +92,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
       if (isLoggedIn && isAuthRoute) {
-        final profile = ref.read(currentProfileProvider).valueOrNull;
+        final profileAsync = ref.read(currentProfileProvider);
+        if (profileAsync.isLoading) return null;
+        final profile = profileAsync.valueOrNull;
         return profile?.permissions.homeRoute ?? '/';
       }
       // Rotas públicas — não redirecionar para o painel (manutenção/locação).

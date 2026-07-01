@@ -1,7 +1,10 @@
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
+import 'package:cond_manager/features/dashboard/presentation/providers/dashboard_financial_providers.dart';
 import 'package:cond_manager/features/dashboard/presentation/providers/dashboard_providers.dart';
+import 'package:cond_manager/features/dashboard/presentation/widgets/dashboard_charts_section.dart';
 import 'package:cond_manager/features/dashboard/presentation/widgets/dashboard_filters_bar.dart';
+import 'package:cond_manager/features/dashboard/presentation/widgets/dashboard_financial_kpi_section.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,21 +66,25 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         return RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(dashboardStatsProvider);
+            ref.invalidate(dashboardFinancialMetricsProvider);
             ref.invalidate(currentProfileProvider);
             ref.invalidate(accessibleCondominiumsProvider);
-            await ref.read(dashboardStatsProvider.future);
+            await Future.wait([
+              ref.read(dashboardStatsProvider.future),
+              ref.read(dashboardFinancialMetricsProvider.future),
+            ]);
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClaySurface(
                   depth: ClayDepth.floating,
-                  radius: ClayTokens.radiusHero,
+                  radius: ClayTokens.radiusMd,
                   glass: true,
-                  padding: const EdgeInsets.all(28),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Row(
                     children: [
                       Expanded(
@@ -86,52 +93,46 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                           children: [
                             Text(
                               'Olá, ${profile.fullName}!',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.6,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.4,
                                   ),
                             ),
-                            const SizedBox(height: 8),
                             Text(
                               profile.isPlatformAdmin
                                   ? 'Administrador da plataforma'
                                   : roles.isEmpty
-                                      ? 'Sem condomínio vinculado — peça ao admin para associar seu usuário'
-                                      : '${roles.length} condomínio(s) vinculado(s)',
+                                      ? 'Sem condomínio vinculado'
+                                      : '${roles.length} condomínio(s)',
                               style: const TextStyle(
                                 color: ClayTokens.textSecondary,
                                 fontWeight: FontWeight.w500,
+                                fontSize: 11,
                               ),
                             ),
                           ],
                         ),
                       ),
                       Container(
-                        width: 60,
-                        height: 60,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           gradient: ClayTokens.primaryGradient,
-                          borderRadius: BorderRadius.circular(ClayTokens.radiusMd),
-                          boxShadow: [
-                            BoxShadow(
-                              color: ClayTokens.accent.withValues(alpha: 0.35),
-                              offset: const Offset(0, 8),
-                              blurRadius: 20,
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
                         ),
-                        child: const Icon(Icons.waving_hand_rounded, color: Colors.white, size: 30),
+                        child: const Icon(Icons.waving_hand_rounded, color: Colors.white, size: 18),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 10),
                 DashboardFiltersBar(
                   filter: filter,
                   condominiums: condos,
                   onChanged: (f) => ref.read(dashboardFilterProvider.notifier).state = f,
+                  compact: true,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -140,15 +141,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                         children: [
                           Text(
                             'Visão geral',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
-                          const SizedBox(height: 4),
                           Text(
                             periodLabel,
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 10,
                               color: ClayTokens.textSecondary,
                             ),
                           ),
@@ -158,23 +158,28 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     if (statsAsync.hasError)
                       TextButton(
                         onPressed: () => ref.invalidate(dashboardStatsProvider),
-                        child: const Text('Atualizar'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Atualizar', style: TextStyle(fontSize: 11)),
                       ),
                   ],
                 ),
                 if (statsAsync.hasError) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
                     'Não foi possível carregar os indicadores: ${statsAsync.error}',
-                    style: const TextStyle(color: ClayTokens.error, fontSize: 13),
+                    style: const TextStyle(color: ClayTokens.error, fontSize: 10),
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 statsAsync.when(
                   loading: () => const Center(
                     child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: CircularProgressIndicator(strokeWidth: 3),
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   ),
                   error: (_, _) => _StatsGrid(
@@ -185,17 +190,36 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       lowStockCount: 0,
                     ),
                     valuesHidden: true,
+                    compact: true,
                   ),
-                  data: (stats) => _StatsGrid(stats: stats),
+                  data: (stats) => _StatsGrid(stats: stats, compact: true),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 10),
                 Text(
-                  'Acesso rápido',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  'Financeiro e manutenção',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 6),
+                const DashboardFinancialKpiSection(
+                  compact: true,
+                  pairOccupancyProfitability: true,
+                ),
+                const SizedBox(height: 8),
+                const DashboardChartsSection(
+                  compact: true,
+                  showHeader: false,
+                  pairOccupancyProfitabilityCharts: true,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Acesso rápido',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
                 ClayListTileCard(
                   icon: Icons.support_agent_rounded,
                   title: 'Chamados',
@@ -203,7 +227,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   gradientIndex: 5,
                   onTap: () => context.go('/tickets'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 ClayListTileCard(
                   icon: Icons.assignment_rounded,
                   title: 'Ordens de serviço',
@@ -211,7 +235,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   gradientIndex: 1,
                   onTap: () => context.go('/work-orders'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 ClayListTileCard(
                   icon: Icons.apartment_rounded,
                   title: 'Condomínios',
@@ -232,20 +256,73 @@ class _StatsGrid extends StatelessWidget {
   const _StatsGrid({
     required this.stats,
     this.valuesHidden = false,
+    this.compact = false,
   });
 
   final DashboardStats stats;
   final bool valuesHidden;
+  final bool compact;
 
   String _formatCount(int n) => valuesHidden ? '—' : '$n';
 
   @override
   Widget build(BuildContext context) {
+    final cards = [
+      ClayStatCard(
+        compact: compact,
+        title: 'Chamados abertos',
+        value: _formatCount(stats.openTicketsCount),
+        icon: Icons.support_agent_rounded,
+        accentColor: ClayTokens.warning,
+        gradientIndex: 5,
+        onTap: () => context.go('/tickets'),
+      ),
+      ClayStatCard(
+        compact: compact,
+        title: 'OS ativas',
+        value: _formatCount(stats.activeWorkOrdersCount),
+        icon: Icons.assignment_rounded,
+        accentColor: ClayTokens.accent,
+        gradientIndex: 1,
+        onTap: () => context.go('/work-orders'),
+      ),
+      ClayStatCard(
+        compact: compact,
+        title: 'Preventivas vencendo',
+        value: _formatCount(stats.preventiveDueCount),
+        icon: Icons.event_repeat_rounded,
+        accentColor: ClayTokens.tertiary,
+        gradientIndex: 4,
+        onTap: () => context.go('/preventive'),
+      ),
+      ClayStatCard(
+        compact: compact,
+        title: 'Estoque baixo',
+        value: _formatCount(stats.lowStockCount),
+        icon: Icons.inventory_2_rounded,
+        accentColor: ClayTokens.accentAlt,
+        gradientIndex: 2,
+        onTap: () => context.go('/materials'),
+      ),
+    ];
+
+    if (compact) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(child: cards[i]),
+          ],
+        ],
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 1000
+        final crossAxisCount = constraints.maxWidth > 900
             ? 4
-            : constraints.maxWidth > 640
+            : constraints.maxWidth > 480
                 ? 2
                 : 1;
         return GridView.count(
@@ -255,40 +332,7 @@ class _StatsGrid extends StatelessWidget {
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
           childAspectRatio: 1.55,
-          children: [
-            ClayStatCard(
-              title: 'Chamados abertos',
-              value: _formatCount(stats.openTicketsCount),
-              icon: Icons.support_agent_rounded,
-              accentColor: ClayTokens.warning,
-              gradientIndex: 5,
-              onTap: () => context.go('/tickets'),
-            ),
-            ClayStatCard(
-              title: 'OS ativas',
-              value: _formatCount(stats.activeWorkOrdersCount),
-              icon: Icons.assignment_rounded,
-              accentColor: ClayTokens.accent,
-              gradientIndex: 1,
-              onTap: () => context.go('/work-orders'),
-            ),
-            ClayStatCard(
-              title: 'Preventivas vencendo',
-              value: _formatCount(stats.preventiveDueCount),
-              icon: Icons.event_repeat_rounded,
-              accentColor: ClayTokens.tertiary,
-              gradientIndex: 4,
-              onTap: () => context.go('/preventive'),
-            ),
-            ClayStatCard(
-              title: 'Estoque baixo',
-              value: _formatCount(stats.lowStockCount),
-              icon: Icons.inventory_2_rounded,
-              accentColor: ClayTokens.accentAlt,
-              gradientIndex: 2,
-              onTap: () => context.go('/materials'),
-            ),
-          ],
+          children: cards,
         );
       },
     );

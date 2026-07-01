@@ -43,6 +43,7 @@ app.*.map.json
 .env
 .env.local
 .env.*.local
+dart_defines.json
 
 # Generated
 *.g.dart

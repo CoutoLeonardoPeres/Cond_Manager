@@ -7,6 +7,7 @@ import 'package:cond_manager/features/providers/presentation/utils/provider_perm
 import 'package:cond_manager/shared/domain/enums/entity_status.dart';
 import 'package:cond_manager/shared/domain/enums/service_type.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
+import 'package:cond_manager/shared/widgets/form/responsive_filter_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -103,24 +104,23 @@ class _FiltersBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          condosAsync.when(
-            data: (condos) {
-              if (condos.isEmpty) return const SizedBox.shrink();
-              final items = [
-                const _CondoFilterOption(id: null, label: 'Todos os condomínios'),
-                ...condos.map((c) => _CondoFilterOption(id: c.id, label: c.name)),
-              ];
-              final selected = items.firstWhere(
-                (o) => o.id == filter.condominiumId,
-                orElse: () => items.first,
-              );
-              return ClayDropdownField<_CondoFilterOption>(
+      child: condosAsync.when(
+        data: (condos) {
+          final condoItems = [
+            const _CondoFilterOption(id: null, label: 'Todos os condomínios'),
+            ...condos.map((c) => _CondoFilterOption(id: c.id, label: c.name)),
+          ];
+          final selectedCondo = condoItems.firstWhere(
+            (o) => o.id == filter.condominiumId,
+            orElse: () => condoItems.first,
+          );
+
+          final fields = <Widget>[
+            if (condos.isNotEmpty)
+              ClayDropdownField<_CondoFilterOption>(
                 label: 'Condomínio',
-                value: selected,
-                items: items,
+                value: selectedCondo,
+                items: condoItems,
                 itemLabel: (o) => o.label,
                 onChanged: (v) => onFilterChanged(
                   filter.copyWith(
@@ -128,46 +128,37 @@ class _FiltersBar extends StatelessWidget {
                     clearCondominium: v?.id == null,
                   ),
                 ),
-              );
-            },
-            loading: () => const LinearProgressIndicator(),
-            error: (_, _) => const SizedBox.shrink(),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ClayDropdownField<ServiceType?>(
-                  label: 'Área de serviço',
-                  value: filter.serviceType,
-                  items: [null, ...ServiceType.values],
-                  itemLabel: (v) => v?.label ?? 'Todas as áreas',
-                  onChanged: (v) => onFilterChanged(
-                    filter.copyWith(
-                      serviceType: v,
-                      clearServiceType: v == null,
-                    ),
-                  ),
+              ),
+            ClayDropdownField<ServiceType?>(
+              label: 'Área de serviço',
+              value: filter.serviceType,
+              items: [null, ...ServiceType.values],
+              itemLabel: (v) => v?.label ?? 'Todas as áreas',
+              onChanged: (v) => onFilterChanged(
+                filter.copyWith(
+                  serviceType: v,
+                  clearServiceType: v == null,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ClayDropdownField<EntityStatus?>(
-                  label: 'Status',
-                  value: filter.status,
-                  items: [null, ...EntityStatus.values],
-                  itemLabel: (v) => v?.label ?? 'Todos',
-                  onChanged: (v) => onFilterChanged(
-                    filter.copyWith(
-                      status: v,
-                      clearStatus: v == null,
-                    ),
-                  ),
+            ),
+            ClayDropdownField<EntityStatus?>(
+              label: 'Status',
+              value: filter.status,
+              items: [null, ...EntityStatus.values],
+              itemLabel: (v) => v?.label ?? 'Todos',
+              onChanged: (v) => onFilterChanged(
+                filter.copyWith(
+                  status: v,
+                  clearStatus: v == null,
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+          ];
+
+          return ResponsiveFilterLayout(fields: fields, wideColumns: 3);
+        },
+        loading: () => const LinearProgressIndicator(),
+        error: (_, _) => const SizedBox.shrink(),
       ),
     );
   }

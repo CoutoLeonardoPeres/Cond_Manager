@@ -57,47 +57,28 @@ class RentalChargesBoard extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        const minColumnWidth = 240.0;
-        final useRow = constraints.maxWidth >= minColumnWidth * 3 + 32;
+        final isMobile = constraints.maxWidth < 640;
+        final gap = isMobile ? 6.0 : 12.0;
 
-        final columns = RentalChargeBoardColumn.values
-            .map(
-              (column) => _ChargesBoardColumn(
-                column: column,
-                charges: grouped[column]!,
-                currency: currency,
-                dateFmt: dateFmt,
-                canManage: canManage,
-                onOpenCharge: onOpenCharge,
-                onConfirmPayment: onConfirmPayment,
-                width: useRow ? null : minColumnWidth,
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < RentalChargeBoardColumn.values.length; i++) ...[
+              if (i > 0) SizedBox(width: gap),
+              Expanded(
+                child: _ChargesBoardColumn(
+                  column: RentalChargeBoardColumn.values[i],
+                  charges: grouped[RentalChargeBoardColumn.values[i]]!,
+                  currency: currency,
+                  dateFmt: dateFmt,
+                  canManage: canManage,
+                  onOpenCharge: onOpenCharge,
+                  onConfirmPayment: onConfirmPayment,
+                  isMobile: isMobile,
+                ),
               ),
-            )
-            .toList();
-
-        if (useRow) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < columns.length; i++) ...[
-                if (i > 0) const SizedBox(width: 12),
-                Expanded(child: columns[i]),
-              ],
             ],
-          );
-        }
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < columns.length; i++) ...[
-                if (i > 0) const SizedBox(width: 12),
-                columns[i],
-              ],
-            ],
-          ),
+          ],
         );
       },
     );
@@ -113,7 +94,7 @@ class _ChargesBoardColumn extends StatelessWidget {
     required this.canManage,
     required this.onOpenCharge,
     required this.onConfirmPayment,
-    this.width,
+    required this.isMobile,
   });
 
   final RentalChargeBoardColumn column;
@@ -123,62 +104,81 @@ class _ChargesBoardColumn extends StatelessWidget {
   final bool canManage;
   final void Function(RentalCharge charge) onOpenCharge;
   final void Function(RentalCharge charge) onConfirmPayment;
-  final double? width;
+  final bool isMobile;
+
+  String get _headerLabel => switch (column) {
+        RentalChargeBoardColumn.newCharges => isMobile ? 'Novas' : column.label,
+        RentalChargeBoardColumn.overdue => isMobile ? 'Atraso' : column.label,
+        RentalChargeBoardColumn.paid => column.label,
+      };
 
   @override
   Widget build(BuildContext context) {
     final color = boardColumnColor(column);
 
-    final content = Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ClaySurface(
           depth: ClayDepth.pressed,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          radius: isMobile ? ClayTokens.radiusSm : ClayTokens.radiusMd,
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 6 : 12,
+            vertical: isMobile ? 6 : 10,
+          ),
           child: Row(
             children: [
               Container(
-                width: 8,
-                height: 8,
+                width: isMobile ? 6 : 8,
+                height: isMobile ? 6 : 8,
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: isMobile ? 4 : 8),
               Expanded(
                 child: Text(
-                  column.label,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                  _headerLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: isMobile ? 10 : 13,
+                  ),
                 ),
               ),
               Text(
                 '${charges.length}',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  fontSize: 12,
+                  fontSize: isMobile ? 10 : 12,
                   color: color,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isMobile ? 6 : 8),
         if (charges.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
+            padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 24),
             child: Text(
-              'Nenhuma cobrança',
+              '—',
               textAlign: TextAlign.center,
-              style: TextStyle(color: ClayTokens.muted.withValues(alpha: 0.8), fontSize: 12),
+              style: TextStyle(
+                color: ClayTokens.muted.withValues(alpha: 0.8),
+                fontSize: isMobile ? 10 : 12,
+              ),
             ),
           )
         else
           ...charges.map(
             (charge) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.only(bottom: isMobile ? 6 : 8),
               child: RentalChargeTile(
                 charge: charge,
                 currency: currency,
                 dateFmt: dateFmt,
-                compact: true,
+                compact: !isMobile,
+                ultraCompact: isMobile,
                 canManage: canManage,
                 onTap: () => onOpenCharge(charge),
                 onConfirmPayment: charge.canConfirmPayment
@@ -189,10 +189,5 @@ class _ChargesBoardColumn extends StatelessWidget {
           ),
       ],
     );
-
-    if (width != null) {
-      return SizedBox(width: width, child: content);
-    }
-    return content;
   }
 }

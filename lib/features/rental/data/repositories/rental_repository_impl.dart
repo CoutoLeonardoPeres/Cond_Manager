@@ -11,6 +11,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_inclusion_ca
 import 'package:cond_manager/features/rental/domain/entities/rental_property_inclusion.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property_photo.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property_pnl.dart';
+import 'package:cond_manager/features/rental/domain/utils/rental_booking_kind.dart';
 import 'package:cond_manager/features/rental/domain/repositories/rental_repository.dart';
 import 'package:cond_manager/shared/domain/enums/rental_booking_channel.dart';
 import 'package:cond_manager/shared/domain/enums/rental_booking_status.dart';
@@ -698,14 +699,18 @@ class RentalRepositoryImpl implements RentalRepository {
     DateTime? from,
     DateTime? to,
     String? propertyId,
+    bool shortStayOnly = false,
   }) async {
     try {
       var query = _client.from('rental_bookings').select(_bookingSelect);
       if (propertyId != null) query = query.eq('property_id', propertyId);
       if (from != null) query = query.gte('check_out', _dateStr(from));
       if (to != null) query = query.lte('check_in', _dateStr(to));
+      if (shortStayOnly) query = query.eq('is_fixed_rent', false);
       final data = await query.order('check_in', ascending: false).limit(500);
-      return Success((data as List).map((e) => _bookingFromMap(e as Map<String, dynamic>)).toList());
+      var list = (data as List).map((e) => _bookingFromMap(e as Map<String, dynamic>)).toList();
+      if (shortStayOnly) list = filterShortStayRentalBookings(list);
+      return Success(list);
     } on PostgrestException catch (e) {
       return Failure(_mapError(e));
     } catch (e) {
@@ -952,6 +957,7 @@ class RentalRepositoryImpl implements RentalRepository {
       final finRow = await _client.from('financial_records').insert({
         'scope': condoId != null ? 'condominium' : 'management_company',
         if (condoId != null) 'condominium_id': condoId,
+        if (condoId == null) 'management_company_id': c.companyId,
         if (propertyId != null) 'rental_property_id': propertyId,
         'record_type': 'income',
         'category': 'revenue',
@@ -1000,7 +1006,7 @@ class RentalRepositoryImpl implements RentalRepository {
     id, company_id, property_id, unit_id, guest_party_id, booking_number, channel, status,
     guest_name, guest_email, guest_phone, guests_count, check_in, check_out,
     nightly_rate, total_amount, paid_amount, is_fixed_rent, monthly_rent, payment_due_day, notes,
-    rental_properties ( title ),
+    rental_properties ( title, listing_mode ),
     rental_parties!rental_bookings_guest_party_id_fkey ( document_number )
   ''';
 
@@ -1225,6 +1231,9 @@ class RentalRepositoryImpl implements RentalRepository {
       companyId: map['company_id'] as String,
       propertyId: map['property_id'] as String,
       propertyTitle: prop?['title'] as String? ?? '—',
+      propertyListingMode: prop?['listing_mode'] != null
+          ? RentalListingMode.fromValue(prop!['listing_mode'] as String)
+          : null,
       unitId: map['unit_id'] as String?,
       bookingNumber: map['booking_number'] as String?,
       channel: RentalBookingChannel.fromValue(map['channel'] as String),

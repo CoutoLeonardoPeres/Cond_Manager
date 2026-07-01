@@ -1,0 +1,486 @@
+{
+  "meta": {
+    "name": "Cond Manager",
+    "version": "0.1.0",
+    "description": "Plataforma de gestão de manutenção de condomínios e locação de imóveis",
+    "generatedAt": "2026-06-27",
+    "repositoryPath": "App_Cond_Manager",
+    "documentationFiles": {
+      "chatHistorySummary": "docs/HISTORICO_CHAT_E_SISTEMA.md",
+      "architecture": "docs/ARCHITECTURE.md",
+      "databaseExport": "docs/cond_manager_database_full.sql",
+      "dartDefinesTemplate": "dart_defines.example.json",
+      "thisBlueprint": "docs/cond_manager_system_blueprint.json"
+    }
+  },
+  "technologyStack": {
+    "frontend": {
+      "framework": "Flutter",
+      "sdk": "^3.10.1",
+      "stateManagement": "flutter_riverpod ^2.6.1",
+      "navigation": "go_router ^15.1.2",
+      "serialization": ["freezed_annotation", "json_annotation"],
+      "fonts": ["Plus Jakarta Sans (web)", "system (mobile)"],
+      "other": ["intl", "image_picker", "file_picker", "cached_network_image", "pdf", "printing", "shared_preferences"]
+    },
+    "backend": {
+      "platform": "Supabase",
+      "database": "PostgreSQL",
+      "auth": "Supabase Auth",
+      "storage": "Supabase Storage",
+      "security": "Row Level Security (RLS)",
+      "clientPackage": "supabase_flutter ^2.9.1"
+    },
+    "environment": {
+      "requiredDartDefines": ["SUPABASE_URL", "SUPABASE_ANON_KEY"],
+      "optionalEnvFile": ".env",
+      "dartDefinesFile": "dart_defines.json",
+      "dartDefinesTemplate": "dart_defines.example.json",
+      "loadOrder": ["compile-time dart-define", ".env asset via EnvLoader"],
+      "configFiles": {
+        "appConfig": "lib/core/config/app_config.dart",
+        "envLoader": "lib/core/config/env_loader.dart",
+        "bootstrap": "lib/core/config/bootstrap_app.dart",
+        "supabaseBootstrap": "lib/core/config/supabase_bootstrap.dart",
+        "launchConfigs": ".vscode/launch.json"
+      },
+      "notes": [
+        "Never call String.fromEnvironment at runtime (breaks Web)",
+        "Validate anon key is full JWT (3 segments, 80+ chars)",
+        "dart_defines.json is gitignored"
+      ]
+    }
+  },
+  "architecture": {
+    "pattern": "Clean Architecture por feature",
+    "layers": ["domain", "data", "presentation"],
+    "coreFolders": ["lib/core/config", "lib/core/theme", "lib/core/router", "lib/core/permissions", "lib/core/modules", "lib/core/providers"],
+    "sharedFolders": ["lib/shared/domain/enums", "lib/shared/widgets/clay", "lib/shared/widgets/form"],
+    "providerPattern": {
+      "repository": "Provider<*Repository> → *RepositoryImpl(supabaseClientProvider)",
+      "data": "FutureProvider.autoDispose (+ .family para por-id)",
+      "uiState": "StateProvider / StateProvider.autoDispose",
+      "derived": "Provider watch composition"
+    },
+    "resultPattern": "Result<T> com .when(success:, failure:) nos repositórios"
+  },
+  "designSystem": {
+    "name": "Soft Dark & Mint",
+    "tokensFile": "lib/core/theme/clay_tokens.dart",
+    "themeFile": "lib/core/theme/app_theme.dart",
+    "decorationsFile": "lib/core/theme/clay_decorations.dart",
+    "widgetsPackage": "lib/shared/widgets/clay/",
+    "colors": {
+      "accent": "#00BFA5",
+      "accentAlt": "#00ACC1",
+      "sidebar": "#2C3E50",
+      "canvas": "#E8F4F2",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#DC2626"
+    },
+    "radius": {
+      "card": 20,
+      "button": 20,
+      "sm": 16,
+      "full": 999
+    },
+    "components": ["ClaySurface", "ClayCard", "ClayStatCard", "ClayDropdownField", "ClayListTileCard", "ClayChartCard (custom charts)"]
+  },
+  "appModules": [
+    {
+      "id": "maintenance",
+      "label": "Manutenção",
+      "homeRoute": "/",
+      "description": "Condomínios, chamados, ordens de serviço, materiais, preventivas, financeiro"
+    },
+    {
+      "id": "rental",
+      "label": "Locação",
+      "homeRoute": "/rental",
+      "description": "Imóveis, contratos, reservas, cobranças, despesas, mapa de ocupação"
+    }
+  ],
+  "accessControl": {
+    "file": "lib/core/permissions/app_permissions.dart",
+    "tiers": ["platformAdmin", "manager", "analyst", "fieldTeam", "client", "legacyStaff"],
+    "organizationRoles": ["manager", "analyst", "fieldTeam", "client"],
+    "keyCapabilities": {
+      "canManageRental": "módulo rental + admin|manager|analyst",
+      "canManageUsers": "admin|manager",
+      "canViewAccessLogs": "admin|org manager",
+      "canCreateCondominium": "admin|manager"
+    }
+  },
+  "features": [
+    {
+      "id": "auth",
+      "path": "lib/features/auth",
+      "capabilities": ["login", "register", "forgot password", "profile", "invites"]
+    },
+    {
+      "id": "shell",
+      "path": "lib/features/shell",
+      "capabilities": [
+        "app layout",
+        "sidebar navigation (desktop)",
+        "bottom navigation (mobile)",
+        "customizable mobile shortcuts (up to 4 + Menu)",
+        "module switcher",
+        "auth session loading guard"
+      ],
+      "keyFiles": [
+        "presentation/pages/app_shell_page.dart",
+        "data/mobile_nav_shortcuts_storage.dart",
+        "presentation/providers/mobile_nav_shortcuts_provider.dart",
+        "presentation/widgets/mobile_nav_shortcuts_sheet.dart",
+        "presentation/widgets/mobile_nav_menu_sheet.dart"
+      ]
+    },
+    {
+      "id": "dashboard",
+      "path": "lib/features/dashboard",
+      "capabilities": [
+        "operational KPIs (tickets, work orders, preventive, low stock)",
+        "financial KPIs (balance, expenses, occupancy, profitability)",
+        "custom Clay charts",
+        "period and condominium filters"
+      ],
+      "keyFiles": [
+        "presentation/pages/dashboard_page.dart",
+        "domain/dashboard_financial_metrics.dart",
+        "presentation/providers/dashboard_financial_providers.dart",
+        "presentation/widgets/clay_chart_widgets.dart",
+        "presentation/widgets/dashboard_financial_kpi_section.dart",
+        "presentation/widgets/dashboard_charts_section.dart"
+      ]
+    },
+    {
+      "id": "condominiums",
+      "path": "lib/features/condominiums",
+      "capabilities": ["CRUD condominiums", "blocks", "towers", "units", "common areas"]
+    },
+    {
+      "id": "tickets",
+      "path": "lib/features/tickets",
+      "capabilities": ["chamados", "workflow to work orders", "filters by name/cpf/phone/email"]
+    },
+    {
+      "id": "work_orders",
+      "path": "lib/features/work_orders",
+      "capabilities": ["OS lifecycle", "materials", "labor", "photos", "status guards"]
+    },
+    {
+      "id": "providers",
+      "path": "lib/features/providers",
+      "capabilities": ["service providers", "contracts", "evaluations"]
+    },
+    {
+      "id": "materials",
+      "path": "lib/features/materials",
+      "capabilities": ["inventory", "categories", "suppliers", "pricing", "stock movements"]
+    },
+    {
+      "id": "preventive",
+      "path": "lib/features/preventive",
+      "capabilities": ["preventive plans", "executions", "notifications"]
+    },
+    {
+      "id": "financial",
+      "path": "lib/features/financial",
+      "capabilities": ["financial records", "condominium and company scope", "categories", "work order link"]
+    },
+    {
+      "id": "rental",
+      "path": "lib/features/rental",
+      "capabilities": [
+        "properties with photos and inclusions",
+        "leases and contract PDF terms",
+        "bookings and channels",
+        "charges with payment methods",
+        "expenses spreadsheet and mobile draft modal",
+        "occupancy Gantt map with compact mobile header",
+        "parties and tenant intake",
+        "P&L reports",
+        "recurring fixed expenses"
+      ],
+      "keyFiles": [
+        "presentation/pages/rental_dashboard_page.dart",
+        "presentation/pages/rental_expenses_page.dart",
+        "presentation/pages/rental_calendar_page.dart",
+        "presentation/widgets/rental_expense_draft_sheet.dart",
+        "presentation/widgets/rental_expenses_spreadsheet.dart",
+        "presentation/widgets/rental_occupancy_view.dart",
+        "presentation/widgets/rental_gantt_chart.dart",
+        "presentation/providers/rental_providers.dart"
+      ]
+    },
+    {
+      "id": "users",
+      "path": "lib/features/users",
+      "capabilities": ["user management", "roles", "invitations"]
+    },
+    {
+      "id": "access_logs",
+      "path": "lib/features/access_logs",
+      "capabilities": ["session and access logging"]
+    },
+    {
+      "id": "modules",
+      "path": "lib/features/modules",
+      "capabilities": ["company module licensing admin"]
+    }
+  ],
+  "routes": {
+    "public": [
+      "/login",
+      "/register",
+      "/forgot-password",
+      "/invite/:token",
+      "/cadastro-locatario/:token"
+    ],
+    "maintenance": [
+      "/",
+      "/condominiums",
+      "/tickets",
+      "/work-orders",
+      "/providers",
+      "/materials",
+      "/preventive",
+      "/financial",
+      "/users",
+      "/access-logs",
+      "/admin/modules"
+    ],
+    "rental": [
+      "/rental",
+      "/rental/properties",
+      "/rental/leases",
+      "/rental/bookings",
+      "/rental/calendar",
+      "/rental/parties",
+      "/rental/charges",
+      "/rental/expenses",
+      "/rental/reports",
+      "/rental/condominiums"
+    ],
+    "routerFile": "lib/core/router/app_router.dart"
+  },
+  "mobileUX": {
+    "breakpointWidth": 640,
+    "bottomNavigation": {
+      "maxShortcuts": 4,
+      "menuItemLabel": "Menu",
+      "storage": "shared_preferences per AppModule",
+      "customizeEntry": "Menu sheet → Personalizar barra inferior"
+    },
+    "filterCarousel": {
+      "layoutWidget": "lib/shared/widgets/form/filter_carousel_layout.dart",
+      "responsiveWidget": "lib/shared/widgets/form/responsive_filter_layout.dart",
+      "usedOn": ["rental properties", "leases", "bookings", "charges", "dashboard", "tickets", "work orders", "providers", "materials"]
+    },
+    "rentalScreens": {
+      "charges": {
+        "mobileColumns": 3,
+        "tileMode": "ultraCompact",
+        "payButtonLabel": "Pagar"
+      },
+      "expenses": {
+        "addFlowMobile": "rental_expense_draft_sheet modal",
+        "addFlowDesktop": "inline draft row in spreadsheet",
+        "fabLabel": "Nova despesa"
+      },
+      "occupancy": {
+        "mobileLegend": "bottom sheet via info icon",
+        "propertyColumnWidth": 108,
+        "rowHeight": 44,
+        "headerStyle": "compact chips for horizon and view mode"
+      }
+    },
+    "iosNotes": [
+      "Xcode scheme Runner uses Release (opens from home screen icon)",
+      "Xcode scheme Runner-Debug for LLDB debugging only",
+      "Cursor: use Cond Manager (iOS) launch config (flutterMode release)",
+      "Debug builds without debugger close immediately (white flash)",
+      "Avoid truncated SUPABASE_ANON_KEY in Generated.xcconfig",
+      "bootstrap_app + supabase_bootstrap: retry boot, clear corrupted auth session"
+    ]
+  },
+  "sharedEnums": {
+    "location": "lib/shared/domain/enums/",
+    "count": 35,
+    "highlights": [
+      "AppModule",
+      "UserRole",
+      "OrganizationRole",
+      "ServiceType",
+      "TicketStatus",
+      "WorkOrderStatus",
+      "FinancialScope",
+      "FinancialRecordType",
+      "FinancialCategory",
+      "CondominiumBillType",
+      "RentalExpenseEntryType",
+      "RentalLeaseStatus",
+      "RentalBookingStatus",
+      "RentalChargeStatus",
+      "RentalPartyCategory",
+      "RentalInclusionCategory"
+    ]
+  },
+  "database": {
+    "migrationsPath": "supabase/migrations/",
+    "migrationsCount": 54,
+    "fullExportFile": "docs/cond_manager_database_full.sql",
+    "legacyFullSchema": "supabase/cond_manager_full_schema.sql",
+    "applyOrder": "Run migrations 00001 through 00054 in numeric order",
+    "seeds": [
+      "supabase/seed_optional.sql",
+      "supabase/seed_rental_module.sql",
+      "supabase/seed_material_categories.sql",
+      "supabase/migrations/00037_seed_praia_itaparica_rentals.sql"
+    ],
+    "coreTables": {
+      "auth_profiles": ["profiles", "user_condominium_roles", "user_invitations", "organization_users"],
+      "structure": ["condominiums", "blocks", "towers", "units", "common_areas", "equipment"],
+      "operations": ["tickets", "work_orders", "work_order_materials", "work_order_labor", "preventive_plans"],
+      "inventory": ["materials", "material_categories", "material_suppliers", "stock_movements"],
+      "financial": ["financial_records"],
+      "rental": [
+        "rental_properties",
+        "rental_leases",
+        "rental_bookings",
+        "rental_parties",
+        "rental_charges",
+        "rental_property_inclusions",
+        "rental_property_photos",
+        "rental_inclusion_catalog",
+        "rental_tenant_intake_forms",
+        "rental_expense_attachments"
+      ],
+      "admin": ["management_companies", "company_modules", "user_access_sessions", "access_logs"]
+    },
+    "migrationsIndex": [
+      {"id": "00001", "file": "extensions_and_enums.sql", "topic": "extensions and base enums"},
+      {"id": "00002", "file": "profiles_and_roles.sql", "topic": "profiles and roles"},
+      {"id": "00003", "file": "condominiums_structure.sql", "topic": "condominium structure"},
+      {"id": "00004", "file": "providers_and_team.sql", "topic": "providers"},
+      {"id": "00005", "file": "materials.sql", "topic": "materials"},
+      {"id": "00006", "file": "tickets.sql", "topic": "tickets"},
+      {"id": "00007", "file": "work_orders.sql", "topic": "work orders"},
+      {"id": "00008", "file": "preventive_maintenance.sql", "topic": "preventive"},
+      {"id": "00009", "file": "financial.sql", "topic": "financial"},
+      {"id": "00010", "file": "storage_and_functions.sql", "topic": "storage"},
+      {"id": "00011", "file": "rls_policies.sql", "topic": "RLS"},
+      {"id": "00012a", "file": "condominiums_manager_fields.sql", "topic": "manager fields"},
+      {"id": "00012b", "file": "materials_pricing.sql", "topic": "materials pricing"},
+      {"id": "00013", "file": "preventive_notifications.sql", "topic": "preventive notifications"},
+      {"id": "00014", "file": "financial_extended.sql", "topic": "financial extended"},
+      {"id": "00015", "file": "material_suppliers.sql", "topic": "material suppliers"},
+      {"id": "00016", "file": "work_order_labor_extended.sql", "topic": "WO labor"},
+      {"id": "00017", "file": "organization_users.sql", "topic": "organization"},
+      {"id": "00018", "file": "user_invitations_extended.sql", "topic": "invitations"},
+      {"id": "00019", "file": "ticket_status_enum_extend.sql", "topic": "ticket status"},
+      {"id": "00020", "file": "ticket_work_order_workflow.sql", "topic": "ticket WO workflow"},
+      {"id": "00021", "file": "location_type_apartment.sql", "topic": "apartment location"},
+      {"id": "00022", "file": "material_supplier_purchase_history.sql", "topic": "purchase history"},
+      {"id": "00023", "file": "work_order_labor_profile_fkey.sql", "topic": "labor FK"},
+      {"id": "00024", "file": "work_order_terminal_status_guard.sql", "topic": "WO terminal guard"},
+      {"id": "00025", "file": "user_access_sessions.sql", "topic": "access sessions"},
+      {"id": "00026", "file": "user_role_assignment_guard.sql", "topic": "role guard"},
+      {"id": "00027", "file": "access_logs_scope.sql", "topic": "access logs"},
+      {"id": "00028", "file": "app_modules_and_rental.sql", "topic": "rental module schema"},
+      {"id": "00029", "file": "rental_financial_link.sql", "topic": "charge financial link"},
+      {"id": "00030", "file": "rental_maintenance_integration.sql", "topic": "rental maintenance integration"},
+      {"id": "00031", "file": "rental_party_category.sql", "topic": "party category"},
+      {"id": "00032", "file": "rental_property_address_details.sql", "topic": "address details"},
+      {"id": "00033", "file": "rental_property_inclusions.sql", "topic": "inclusions"},
+      {"id": "00034", "file": "rental_property_photos.sql", "topic": "photos"},
+      {"id": "00035", "file": "rental_inclusion_catalog.sql", "topic": "inclusion catalog"},
+      {"id": "00036", "file": "rental_booking_fixed_rent.sql", "topic": "booking fixed rent"},
+      {"id": "00037", "file": "seed_praia_itaparica_rentals.sql", "topic": "seed Itaparica"},
+      {"id": "00038", "file": "restore_itaparica_apts_102_105.sql", "topic": "restore apts"},
+      {"id": "00039", "file": "itaparica_lease_contracts.sql", "topic": "lease contracts"},
+      {"id": "00040", "file": "repair_missing_itaparica_leases.sql", "topic": "repair leases"},
+      {"id": "00041", "file": "rental_party_restrictions.sql", "topic": "party restrictions"},
+      {"id": "00042", "file": "rental_tenant_intake_forms.sql", "topic": "tenant intake"},
+      {"id": "00043", "file": "fix_intake_gen_random_bytes.sql", "topic": "intake fix"},
+      {"id": "00044", "file": "rental_lease_contract_terms.sql", "topic": "contract terms"},
+      {"id": "00045", "file": "rental_property_landlord_profile.sql", "topic": "landlord profile"},
+      {"id": "00046", "file": "rental_monthly_charge_generation.sql", "topic": "monthly charges RPC"},
+      {"id": "00047", "file": "fix_rental_charge_unique_constraint.sql", "topic": "charge unique fix"},
+      {"id": "00048", "file": "rental_charge_dedup_by_property.sql", "topic": "charge dedup"},
+      {"id": "00049", "file": "rental_charge_payment_method.sql", "topic": "payment method"},
+      {"id": "00050", "file": "rental_condominium_expenses.sql", "topic": "condo expenses"},
+      {"id": "00051", "file": "rental_expense_unit_allocation.sql", "topic": "unit allocation"},
+      {"id": "00052", "file": "financial_record_block_id.sql", "topic": "block_id on financial_records"},
+      {"id": "00053", "file": "multi_tenant_security.sql", "topic": "multi-tenant financial RLS and management_company_id"},
+      {"id": "00054", "file": "rental_expense_attachments.sql", "topic": "expense receipt attachments and storage bucket"}
+    ]
+  },
+  "chatSessionWorkSummary": {
+    "period": "2026 conversation through 2026-06-27",
+    "completedItems": [
+      "iOS boot: bootstrap_app retry + supabase_bootstrap session sanitization + Runner Release scheme",
+      "Multi-tenant security migration 00053 (management_company_id, RLS financeiro)",
+      "Despesas: anexos NF/recibo migration 00054 + entity rental_expense_attachment",
+      "Dashboard: KPIs financeiros + gráficos Clay (manutenção e locação)",
+      "Despesas mobile: planilha compacta, rateio por unidade, copiar fixas sem valor",
+      "Reservas: filtros grade nome/CPF/telefone/email",
+      "Imóveis: filtros 50% mais estreitos exceto condomínio",
+      "Design system Soft Dark & Mint refactor",
+      "Mapa ocupação: 2 meses viewport, horizonte 3/6/12, só imóveis com vaga, sem modo Dia, scrollbar fix",
+      "Mapa ocupação mobile: cabeçalho compacto, legenda em sheet, mais área para Gantt",
+      "Despesas: toolbar reorganizada; mobile modal nova despesa + FAB",
+      "Despesas: realce linha em edição, dropdown popup customizado",
+      "Dashboard home: KPIs financeiros + gráficos Clay compactos",
+      "Dashboard locação e manutenção: layouts pareados",
+      "Boot: AppConfig static const dart-defines + EnvLoader .env (fix white screen Web)",
+      "Shell: auth loading guard; barra inferior mobile personalizável (shared_preferences)",
+      "Filtros mobile: carrossel PageView em múltiplas telas",
+      "Cobranças mobile: 3 colunas, botão Pagar ampliado nos cards",
+      "Reservas: removido botão Nova reserva duplicado no estado vazio",
+      "Rental: party category, address details, inclusions, photos (migrations 00031-00034)"
+    ],
+    "keyConstants": {
+      "expensesSpreadsheet": {
+        "file": "lib/features/rental/presentation/widgets/rental_expenses_spreadsheet.dart",
+        "mobileDraftSheet": "lib/features/rental/presentation/widgets/rental_expense_draft_sheet.dart",
+        "rowFontSize": 11,
+        "dropdownMenuFontSize": 10,
+        "dropdownMenuItemHeight": 34,
+        "dropdownMenuMaxHeight": 137,
+        "rowActionIconSize": 14,
+        "actionsColumnWidth": 146
+      },
+      "occupancy": {
+        "defaultHorizonMonths": 3,
+        "visibleMonthsInViewport": 2,
+        "mobilePropertyColumnWidth": 108,
+        "mobileRowHeight": 44
+      },
+      "mobileNav": {
+        "maxBottomShortcuts": 4,
+        "storageKeyPrefix": "mobile_nav_shortcuts_"
+      }
+    }
+  },
+  "replicationGuide": {
+    "steps": [
+      "1. Clone repository or copy lib/, supabase/, pubspec.yaml, assets/",
+      "2. Create Supabase project; run docs/cond_manager_database_full.sql OR migrations in order",
+      "3. cp dart_defines.example.json dart_defines.json (or cp .env.example .env) and set SUPABASE_URL + SUPABASE_ANON_KEY",
+      "4. Run supabase/fix_admin_profile.sql after first user signup",
+      "5. flutter pub get && flutter run -d chrome --dart-define-from-file=dart_defines.json",
+      "6. Enable modules per company in admin/modules",
+      "7. Optional seeds: seed_optional.sql, seed_rental_module.sql"
+    ],
+    "devNotes": [
+      "Disable email confirm in Supabase Auth for local dev",
+      "Platform admin: UPDATE profiles SET is_platform_admin = true",
+      "Two AppModules require company_modules table entries",
+      "iOS: Runner Release scheme + Runner-Debug for LLDB; use flutterMode release in launch.json",
+      "Never commit dart_defines.json or .env"
+    ]
+  }
+}

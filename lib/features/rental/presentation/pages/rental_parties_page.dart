@@ -3,6 +3,7 @@ import 'package:cond_manager/core/permissions/app_permissions.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_party.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/features/rental/presentation/widgets/rental_parties_board.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,7 +56,7 @@ class RentalPartiesPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Proprietários, inquilinos, hóspedes, fiadores e contatos de imobiliárias.',
+                    'Hóspedes, inquilinos, locatários e locadores organizados por coluna.',
                     style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 12),
@@ -122,25 +123,13 @@ class RentalPartiesPage extends ConsumerWidget {
 
                   return RefreshIndicator(
                     onRefresh: () async => ref.invalidate(rentalPartiesListProvider),
-                    child: ListView.separated(
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: EdgeInsets.fromLTRB(20, 0, 20, canCreate ? 88 : 24),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (_, i) {
-                        final p = filtered[i];
-                        return ClayListTileCard(
-                          icon: Icons.person_rounded,
-                          title: p.fullName,
-                          subtitle: [
-                            p.category.label,
-                            if (p.email != null) p.email,
-                            if (p.phone != null) p.phone,
-                            if (p.documentNumber != null) p.documentNumber,
-                            if (p.status != 'active') 'Inativo',
-                          ].whereType<String>().join(' · '),
-                          onTap: () => context.go('/rental/parties/${p.id}/edit'),
-                        );
-                      },
+                      child: RentalPartiesBoard(
+                        parties: filtered,
+                        onOpenParty: (p) => context.go('/rental/parties/${p.id}/edit'),
+                      ),
                     ),
                   );
                 },

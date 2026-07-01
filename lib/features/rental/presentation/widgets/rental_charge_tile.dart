@@ -11,6 +11,7 @@ class RentalChargeTile extends StatelessWidget {
     required this.currency,
     required this.dateFmt,
     this.compact = false,
+    this.ultraCompact = false,
     this.canManage = false,
     this.onTap,
     this.onConfirmPayment,
@@ -20,6 +21,7 @@ class RentalChargeTile extends StatelessWidget {
   final NumberFormat currency;
   final DateFormat dateFmt;
   final bool compact;
+  final bool ultraCompact;
   final bool canManage;
   final VoidCallback? onTap;
   final VoidCallback? onConfirmPayment;
@@ -38,8 +40,89 @@ class RentalChargeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (ultraCompact) return _buildUltraCompact(context);
     if (compact) return _buildCompact(context);
     return _buildFull(context);
+  }
+
+  Widget _buildUltraCompact(BuildContext context) {
+    return ClayCard(
+      onTap: onTap,
+      backgroundColor: _backgroundColor,
+      glass: false,
+      padding: const EdgeInsets.all(6),
+      radius: ClayTokens.radiusSm,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: double.infinity,
+            height: 3,
+            decoration: BoxDecoration(
+              color: _accentColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            charge.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 9,
+                  height: 1.2,
+                  color: charge.isOverdue ? ClayTokens.error : null,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            currency.format(charge.amount),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 10,
+              color: ClayTokens.foreground,
+            ),
+          ),
+          if (charge.dueDate != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              dateFmt.format(charge.dueDate!),
+              maxLines: 1,
+              style: const TextStyle(fontSize: 8, color: ClayTokens.muted, height: 1.1),
+            ),
+          ],
+          if (canManage && charge.canConfirmPayment && onConfirmPayment != null) ...[
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: TextButton.icon(
+                onPressed: onConfirmPayment,
+                icon: Icon(Icons.payments_rounded, size: 18, color: _accentColor),
+                label: Text(
+                  'Pagar',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: _accentColor,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  backgroundColor: _accentColor.withValues(alpha: 0.14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildCompact(BuildContext context) {

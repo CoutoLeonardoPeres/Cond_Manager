@@ -2,11 +2,15 @@ import 'package:cond_manager/core/modules/app_module_providers.dart';
 import 'package:cond_manager/core/modules/app_module_switcher.dart';
 import 'package:cond_manager/core/modules/company_module_access.dart';
 import 'package:cond_manager/core/permissions/app_permissions.dart';
+import 'package:cond_manager/core/providers/supabase_provider.dart';
 import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/features/access_logs/presentation/providers/access_log_providers.dart';
 import 'package:cond_manager/features/access_logs/presentation/widgets/access_session_scope.dart';
 import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
+import 'package:cond_manager/features/shell/presentation/providers/mobile_nav_shortcuts_provider.dart';
+import 'package:cond_manager/features/shell/presentation/widgets/mobile_nav_menu_sheet.dart';
 import 'package:cond_manager/shared/domain/enums/app_module.dart';
+import 'package:cond_manager/shared/widgets/app_loading_scaffold.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,10 +48,80 @@ class AppShellPage extends ConsumerWidget {
     _NavItem('/rental/reports', Icons.assessment_rounded, 'Relatórios'),
   ];
 
+  static const _mobileNavPrimaryCount = 4;
+  static const _mobileNavMenuPath = '__nav_menu__';
+
+  static List<_NavItem> _mobileBottomItems(
+    List<_NavItem> destinations,
+    List<String> savedPaths,
+  ) {
+    if (destinations.length <= 5) return destinations;
+
+    final picked = <_NavItem>[];
+    for (final path in savedPaths) {
+      if (picked.length >= _mobileNavPrimaryCount) break;
+      for (final d in destinations) {
+        if (d.path == path) {
+          picked.add(d);
+          break;
+        }
+      }
+    }
+
+    for (final d in destinations) {
+      if (picked.length >= _mobileNavPrimaryCount) break;
+      if (!picked.any((p) => p.path == d.path)) picked.add(d);
+    }
+
+    return [
+      ...picked,
+      const _NavItem(_mobileNavMenuPath, Icons.apps_rounded, 'Menu'),
+    ];
+  }
+
+  static int _mobileBottomSelectedIndex(
+    List<_NavItem> mobileItems,
+    int destinationIndex,
+    List<_NavItem> destinations,
+  ) {
+    if (destinations.length <= 5) {
+      return destinationIndex.clamp(0, mobileItems.length - 1);
+    }
+
+    final current = destinations[destinationIndex.clamp(0, destinations.length - 1)];
+    final idx = mobileItems.indexWhere((d) => d.path == current.path);
+    if (idx >= 0) return idx;
+    return _mobileNavPrimaryCount;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authAsync = ref.watch(authStateProvider);
     final profileAsync = ref.watch(currentProfileProvider);
     final profile = profileAsync.value;
+    final sessionActive = authAsync.value?.session != null;
+
+    if (authAsync.isLoading) {
+      return const AppLoadingScaffold(message: 'Carregando sessão…');
+    }
+
+    if (sessionActive && profileAsync.isLoading) {
+      return const AppLoadingScaffold(message: 'Carregando perfil…');
+    }
+
+    if (sessionActive && profile == null && !profileAsync.isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Sessão ativa, mas perfil não encontrado.\nVerifique o cadastro no Supabase.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: ClayTokens.textSecondary),
+          ),
+        ),
+      );
+    }
+
     final perms = AppPermissions(profile);
     final moduleAccess = profile.modules;
 
@@ -84,14 +158,43 @@ class AppShellPage extends ConsumerWidget {
         .map((d) => ClayNavItem(icon: d.icon, label: d.label))
         .toList();
 
-    final bottomCount = navItems.length.clamp(1, 5);
+    final savedShortcuts = ref.watch(mobileNavShortcutsProvider(activeModule));
+    final mobileBottomDestinations = _mobileBottomItems(destinations, savedShortcuts);
+    final mobileNavItems = mobileBottomDestinations
+        .map((d) => ClayNavItem(icon: d.icon, label: d.label))
+        .toList();
+    final mobileSelectedIndex = _mobileBottomSelectedIndex(
+      mobileBottomDestinations,
+      safeIndex,
+      destinations,
+    );
     final moduleLabel = activeModule == AppModule.rental ? 'Locação' : 'Manutenção';
+    final isCompactHeader = MediaQuery.sizeOf(context).width < 600;
+
+    void onMobileNavSelected(int i) {
+      final item = mobileBottomDestinations[i];
+      if (item.path == _mobileNavMenuPath) {
+        showMobileNavMenuSheet(
+          context: context,
+          currentPath: location,
+          module: activeModule,
+          ref: ref,
+          items: destinations
+              .map(
+                (d) => MobileNavMenuItem(path: d.path, icon: d.icon, label: d.label),
+              )
+              .toList(),
+        );
+        return;
+      }
+      context.go(item.path);
+    }
 
     return AccessSessionScope(
       child: ClayScaffold(
         showOrbs: false,
         appBar: ClayAppBar(
-          title: 'Cond Manager · $moduleLabel',
+          title: isCompactHeader ? moduleLabel : 'Cond Manager · $moduleLabel',
           actions: [
             const AppModuleSwitcher(),
             profileAsync.when(
@@ -118,9 +221,9 @@ class AppShellPage extends ConsumerWidget {
             : MediaQuery(
                 data: MediaQuery.of(context).copyWith(textScaler: AppTypography.navTextScaler),
                 child: ClayBottomNav(
-                  items: navItems.take(bottomCount).toList(),
-                  selectedIndex: safeIndex.clamp(0, bottomCount - 1),
-                  onSelected: (i) => context.go(destinations[i].path),
+                  items: mobileNavItems,
+                  selectedIndex: mobileSelectedIndex.clamp(0, mobileNavItems.length - 1),
+                  onSelected: onMobileNavSelected,
                 ),
               ),
         body: Row(

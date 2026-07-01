@@ -209,6 +209,7 @@ class FinancialRecordCreateInput extends Equatable {
   const FinancialRecordCreateInput({
     required this.scope,
     this.condominiumId,
+    this.managementCompanyId,
     required this.recordType,
     required this.category,
     required this.description,
@@ -238,6 +239,7 @@ class FinancialRecordCreateInput extends Equatable {
 
   final FinancialScope scope;
   final String? condominiumId;
+  final String? managementCompanyId;
   final FinancialRecordType recordType;
   final FinancialCategory category;
   final String description;

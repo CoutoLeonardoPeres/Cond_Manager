@@ -1,6 +1,7 @@
 import 'package:cond_manager/features/rental/domain/entities/rental_inputs.dart';
 import 'package:cond_manager/shared/domain/enums/rental_lease_status.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
+import 'package:cond_manager/shared/widgets/form/responsive_filter_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -32,51 +33,66 @@ class RentalListFiltersBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (quickFilters != null && onQuickFilterChanged != null) ...[
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: quickFilters!.map((f) {
-              final selected = quickFilter == f;
-              return FilterChip(
-                label: Text(f.label),
-                selected: selected,
-                onSelected: (_) => onQuickFilterChanged!(f),
-                selectedColor: ClayTokens.primary.withValues(alpha: 0.18),
-                checkmarkColor: ClayTokens.primary,
-                labelStyle: TextStyle(
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? ClayTokens.primary : ClayTokens.textSecondary,
-                ),
-                side: BorderSide(
-                  color: selected
-                      ? ClayTokens.primary.withValues(alpha: 0.5)
-                      : ClayTokens.muted.withValues(alpha: 0.35),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 10),
-        ],
-        if (onMonthChanged != null) RentalMonthFilterBar(month: month, onChanged: onMonthChanged!),
-        if (onStatusChanged != null) ...[
-          const SizedBox(height: 10),
-          ClayDropdownField<RentalLeaseStatus?>(
-            label: 'Status do contrato',
-            value: status,
-            items: [null, ...RentalLeaseStatus.values],
-            itemLabel: (s) => s?.label ?? 'Todos os status',
-            onChanged: onStatusChanged,
-          ),
-        ],
-        if (extra != null) ...[
-          const SizedBox(height: 10),
-          extra!,
-        ],
-      ],
+    final fields = <Widget>[];
+
+    if (quickFilters != null && onQuickFilterChanged != null) {
+      fields.add(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: quickFilters!.map((f) {
+            final selected = quickFilter == f;
+            return FilterChip(
+              label: Text(f.label),
+              selected: selected,
+              onSelected: (_) => onQuickFilterChanged!(f),
+              selectedColor: ClayTokens.primary.withValues(alpha: 0.18),
+              checkmarkColor: ClayTokens.primary,
+              labelStyle: TextStyle(
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? ClayTokens.primary : ClayTokens.textSecondary,
+              ),
+              side: BorderSide(
+                color: selected
+                    ? ClayTokens.primary.withValues(alpha: 0.5)
+                    : ClayTokens.muted.withValues(alpha: 0.35),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+    }
+
+    if (onMonthChanged != null) {
+      fields.add(
+        RentalMonthFilterBar(
+          compact: true,
+          month: month,
+          onChanged: onMonthChanged!,
+        ),
+      );
+    }
+
+    if (onStatusChanged != null) {
+      fields.add(
+        ClayDropdownField<RentalLeaseStatus?>(
+          label: 'Status do contrato',
+          value: status,
+          items: [null, ...RentalLeaseStatus.values],
+          itemLabel: (s) => s?.label ?? 'Todos os status',
+          onChanged: onStatusChanged,
+        ),
+      );
+    }
+
+    if (extra != null) fields.add(extra!);
+
+    if (fields.isEmpty) return const SizedBox.shrink();
+
+    return ResponsiveFilterLayout(
+      wideColumns: fields.length.clamp(1, 4),
+      mobileItemHeight: onMonthChanged != null ? 72 : 84,
+      fields: fields,
     );
   }
 }

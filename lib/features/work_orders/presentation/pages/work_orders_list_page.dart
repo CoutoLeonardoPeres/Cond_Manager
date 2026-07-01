@@ -8,6 +8,7 @@ import 'package:cond_manager/features/work_orders/presentation/widgets/work_orde
 import 'package:cond_manager/shared/domain/priority_level_style.dart';
 import 'package:cond_manager/shared/widgets/priority_badge.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
+import 'package:cond_manager/shared/widgets/form/filter_carousel_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -98,17 +99,38 @@ class _FiltersBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final statusRow = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: workOrderFilterStatuses.map((status) {
+          final label = status?.label ?? 'Todos status';
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _FilterChip(
+              label: label,
+              selected: filter.status == status,
+              onTap: () => onFilterChanged(
+                status == null
+                    ? filter.copyWith(clearStatus: true)
+                    : filter.copyWith(status: status),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          condosAsync.when(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final useCarousel = constraints.maxWidth < FilterCarouselLayout.mobileBreakpoint;
+
+          return condosAsync.when(
             data: (condos) {
-              if (condos.length <= 1) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: SingleChildScrollView(
+              Widget? condoRow;
+              if (condos.length > 1) {
+                condoRow = SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
@@ -129,33 +151,31 @@ class _FiltersBar extends StatelessWidget {
                       ),
                     ],
                   ),
-                ),
+                );
+              }
+
+              if (useCarousel && condoRow != null) {
+                return FilterCarouselLayout(
+                  items: [condoRow, statusRow],
+                  itemHeight: 48,
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (condoRow != null) ...[
+                    condoRow,
+                    const SizedBox(height: 10),
+                  ],
+                  statusRow,
+                ],
               );
             },
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-          ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: workOrderFilterStatuses.map((status) {
-                final label = status?.label ?? 'Todos status';
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _FilterChip(
-                    label: label,
-                    selected: filter.status == status,
-                    onTap: () => onFilterChanged(
-                      status == null
-                          ? filter.copyWith(clearStatus: true)
-                          : filter.copyWith(status: status),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
+            loading: () => statusRow,
+            error: (_, _) => statusRow,
+          );
+        },
       ),
     );
   }

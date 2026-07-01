@@ -4,6 +4,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_property.dar
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
 import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
 import 'package:cond_manager/shared/domain/enums/rental_property_type.dart';
+import 'package:cond_manager/shared/widgets/form/responsive_filter_layout.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,9 +13,6 @@ import 'package:intl/intl.dart';
 
 class RentalPropertiesPage extends ConsumerWidget {
   const RentalPropertiesPage({super.key});
-
-  static const _condoFilterWidth = 300.0;
-  static const _filterFieldWidth = _condoFilterWidth / 2;
 
   RentalPropertyListFilter _sanitizeFilter(
     RentalPropertyListFilter filter,
@@ -149,125 +147,100 @@ class RentalPropertiesPage extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const SizedBox(height: 12),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                SizedBox(
-                                  width: _filterFieldWidth,
-                                  child: ClayDropdownField<RentalPropertyType?>(
-                                    label: 'Tipo',
-                                    value: safeFilter.propertyType,
-                                    items: [null, ...RentalPropertyType.values],
-                                    itemLabel: (t) => t?.label ?? 'Todos',
-                                    onChanged: (v) => updateFilter(
-                                      safeFilter.copyWith(propertyType: v, clearType: v == null),
+                          ResponsiveFilterLayout(
+                            wideColumns: 3,
+                            fields: [
+                              ClayDropdownField<RentalPropertyType?>(
+                                label: 'Tipo',
+                                value: safeFilter.propertyType,
+                                items: [null, ...RentalPropertyType.values],
+                                itemLabel: (t) => t?.label ?? 'Todos',
+                                onChanged: (v) => updateFilter(
+                                  safeFilter.copyWith(propertyType: v, clearType: v == null),
+                                ),
+                              ),
+                              ClayDropdownField<RentalListingMode?>(
+                                label: 'Modalidade',
+                                value: safeFilter.listingMode,
+                                items: [null, ...RentalListingMode.values],
+                                itemLabel: (m) => m?.label ?? 'Todas',
+                                onChanged: (v) => updateFilter(
+                                  safeFilter.copyWith(listingMode: v, clearMode: v == null),
+                                ),
+                              ),
+                              if (states.isNotEmpty)
+                                ClayDropdownField<String?>(
+                                  label: 'Estado',
+                                  value: safeFilter.addressState != null &&
+                                          states.any(
+                                            (s) =>
+                                                s.toLowerCase() ==
+                                                safeFilter.addressState!.trim().toLowerCase(),
+                                          )
+                                      ? safeFilter.addressState
+                                      : null,
+                                  items: [null, ...states],
+                                  itemLabel: (s) => s ?? 'Todos',
+                                  onChanged: (v) => updateFilter(
+                                    safeFilter.copyWith(
+                                      addressState: v,
+                                      clearState: v == null,
+                                      clearCity: true,
+                                      clearCondominium: true,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                SizedBox(
-                                  width: _filterFieldWidth,
-                                  child: ClayDropdownField<RentalListingMode?>(
-                                    label: 'Modalidade',
-                                    value: safeFilter.listingMode,
-                                    items: [null, ...RentalListingMode.values],
-                                    itemLabel: (m) => m?.label ?? 'Todas',
-                                    onChanged: (v) => updateFilter(
-                                      safeFilter.copyWith(listingMode: v, clearMode: v == null),
+                              if (cities.isNotEmpty)
+                                ClayDropdownField<String?>(
+                                  label: 'Cidade',
+                                  value: safeFilter.addressCity != null &&
+                                          cities.any(
+                                            (c) =>
+                                                c.toLowerCase() ==
+                                                safeFilter.addressCity!.trim().toLowerCase(),
+                                          )
+                                      ? safeFilter.addressCity
+                                      : null,
+                                  items: [null, ...cities],
+                                  itemLabel: (c) => c ?? 'Todas',
+                                  onChanged: (v) => updateFilter(
+                                    safeFilter.copyWith(
+                                      addressCity: v,
+                                      clearCity: v == null,
+                                      clearCondominium: true,
                                     ),
                                   ),
                                 ),
-                                if (states.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: _filterFieldWidth,
-                                    child: ClayDropdownField<String?>(
-                                      label: 'Estado',
-                                      value: safeFilter.addressState != null &&
-                                              states.any(
-                                                (s) =>
-                                                    s.toLowerCase() ==
-                                                    safeFilter.addressState!.trim().toLowerCase(),
-                                              )
-                                          ? safeFilter.addressState
-                                          : null,
-                                      items: [null, ...states],
-                                      itemLabel: (s) => s ?? 'Todos',
-                                      onChanged: (v) => updateFilter(
-                                        safeFilter.copyWith(
-                                          addressState: v,
-                                          clearState: v == null,
-                                          clearCity: true,
-                                          clearCondominium: true,
-                                        ),
-                                      ),
+                              if (condos.isNotEmpty)
+                                ClayDropdownField<String?>(
+                                  label: 'Condomínio',
+                                  value: condos.any((c) => c.id == safeFilter.condominiumId)
+                                      ? safeFilter.condominiumId
+                                      : null,
+                                  items: [null, ...condos.map((c) => c.id)],
+                                  itemLabel: (id) {
+                                    if (id == null) return 'Todos';
+                                    return condos.firstWhere((c) => c.id == id).label;
+                                  },
+                                  onChanged: (v) => updateFilter(
+                                    safeFilter.copyWith(
+                                      condominiumId: v,
+                                      clearCondominium: v == null,
                                     ),
                                   ),
-                                ],
-                                if (cities.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: _filterFieldWidth,
-                                    child: ClayDropdownField<String?>(
-                                      label: 'Cidade',
-                                      value: safeFilter.addressCity != null &&
-                                              cities.any(
-                                                (c) =>
-                                                    c.toLowerCase() ==
-                                                    safeFilter.addressCity!.trim().toLowerCase(),
-                                              )
-                                          ? safeFilter.addressCity
-                                          : null,
-                                      items: [null, ...cities],
-                                      itemLabel: (c) => c ?? 'Todas',
-                                      onChanged: (v) => updateFilter(
-                                        safeFilter.copyWith(
-                                          addressCity: v,
-                                          clearCity: v == null,
-                                          clearCondominium: true,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                if (condos.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: _condoFilterWidth,
-                                    child: ClayDropdownField<String?>(
-                                      label: 'Condomínio',
-                                      value: condos.any((c) => c.id == safeFilter.condominiumId)
-                                          ? safeFilter.condominiumId
-                                          : null,
-                                      items: [null, ...condos.map((c) => c.id)],
-                                      itemLabel: (id) {
-                                        if (id == null) return 'Todos';
-                                        return condos.firstWhere((c) => c.id == id).label;
-                                      },
-                                      onChanged: (v) => updateFilter(
-                                        safeFilter.copyWith(
-                                          condominiumId: v,
-                                          clearCondominium: v == null,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                if (_hasActiveFilters(safeFilter)) ...[
-                                  const SizedBox(width: 8),
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
+                                ),
+                            ],
+                            trailing: _hasActiveFilters(safeFilter)
+                                ? Align(
+                                    alignment: Alignment.centerRight,
                                     child: TextButton.icon(
-                                      onPressed: () => updateFilter(const RentalPropertyListFilter()),
+                                      onPressed: () =>
+                                          updateFilter(const RentalPropertyListFilter()),
                                       icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
-                                      label: const Text('Limpar'),
+                                      label: const Text('Limpar filtros'),
                                     ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                                  )
+                                : null,
                           ),
                         ],
                       );

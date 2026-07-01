@@ -21,12 +21,39 @@ enum RentalOccupancyViewMode {
       };
 }
 
+/// Meses visíveis de uma vez na tela (modo mês).
+const rentalOccupancyVisibleMonths = 2;
+
+/// Horizonte padrão do mapa (imóveis com vaga + rolagem).
+const rentalOccupancyDefaultHorizonMonths = 3;
+
+const rentalOccupancyHorizonOptions = [3, 6, 12];
+
+/// Modos exibidos no filtro superior da tela de ocupação (sem "Dia").
+const rentalOccupancySelectableViewModes = [
+  RentalOccupancyViewMode.week,
+  RentalOccupancyViewMode.month,
+  RentalOccupancyViewMode.year,
+];
+
 DateTime rentalOccupancyWeekStart(DateTime anchor) {
   final d = rentalGanttDateOnly(anchor);
   return d.subtract(Duration(days: d.weekday - DateTime.monday));
 }
 
-RentalGanttRange rentalOccupancyRangeFor(RentalOccupancyViewMode mode, DateTime anchor) {
+/// Dias dos [rentalOccupancyVisibleMonths] primeiros meses a partir de [rangeStart].
+int rentalOccupancyVisibleDayCount(DateTime rangeStart) {
+  final start = DateTime(rangeStart.year, rangeStart.month, 1);
+  return DateTime(start.year, start.month + rentalOccupancyVisibleMonths, 1)
+      .difference(start)
+      .inDays;
+}
+
+RentalGanttRange rentalOccupancyRangeFor(
+  RentalOccupancyViewMode mode,
+  DateTime anchor, {
+  int monthHorizon = rentalOccupancyDefaultHorizonMonths,
+}) {
   final a = rentalGanttDateOnly(anchor);
   return switch (mode) {
     RentalOccupancyViewMode.day => RentalGanttRange(
@@ -39,7 +66,7 @@ RentalGanttRange rentalOccupancyRangeFor(RentalOccupancyViewMode mode, DateTime 
       }(),
     RentalOccupancyViewMode.month => RentalGanttRange(
         start: DateTime(a.year, a.month, 1),
-        end: DateTime(a.year, a.month + 2, 1),
+        end: DateTime(a.year, a.month + monthHorizon, 1),
       ),
     RentalOccupancyViewMode.year => RentalGanttRange(
         start: DateTime(a.year, 1, 1),
@@ -61,12 +88,17 @@ double rentalOccupancyColumnWidth({
   required RentalOccupancyViewMode mode,
   required double viewportWidth,
   required double propertyColumnWidth,
+  RentalGanttRange? range,
 }) {
-  final available = (viewportWidth - propertyColumnWidth - 8).clamp(120.0, double.infinity);
+  final available = (viewportWidth - propertyColumnWidth).clamp(120.0, double.infinity);
   return switch (mode) {
     RentalOccupancyViewMode.day => available,
     RentalOccupancyViewMode.week => (available / 7).clamp(56.0, 140.0),
-    RentalOccupancyViewMode.month => 20.0,
+    RentalOccupancyViewMode.month => () {
+        if (range == null) return 20.0;
+        final visibleDays = rentalOccupancyVisibleDayCount(range.start);
+        return available / visibleDays;
+      }(),
     RentalOccupancyViewMode.year => (available / 12).clamp(52.0, 96.0),
   };
 }
@@ -80,12 +112,16 @@ DateTime rentalOccupancyStepAnchor(
   return switch (mode) {
     RentalOccupancyViewMode.day => a.add(Duration(days: delta)),
     RentalOccupancyViewMode.week => a.add(Duration(days: 7 * delta)),
-    RentalOccupancyViewMode.month => DateTime(a.year, a.month + delta, 1),
+    RentalOccupancyViewMode.month => DateTime(a.year, a.month + delta * rentalOccupancyVisibleMonths, 1),
     RentalOccupancyViewMode.year => DateTime(a.year + delta, a.month, a.day),
   };
 }
 
-String rentalOccupancyPeriodLabel(RentalOccupancyViewMode mode, DateTime anchor) {
+String rentalOccupancyPeriodLabel(
+  RentalOccupancyViewMode mode,
+  DateTime anchor, {
+  int monthHorizon = rentalOccupancyDefaultHorizonMonths,
+}) {
   final a = rentalGanttDateOnly(anchor);
   return switch (mode) {
     RentalOccupancyViewMode.day => () {
@@ -104,16 +140,13 @@ String rentalOccupancyPeriodLabel(RentalOccupancyViewMode mode, DateTime anchor)
       }(),
     RentalOccupancyViewMode.month => () {
         final start = DateTime(a.year, a.month, 1);
-        final end = DateTime(a.year, a.month + 2, 1).subtract(const Duration(days: 1));
-        final fmt = DateFormat('MMMM', 'pt_BR');
-        final year = DateFormat('yyyy').format(a);
-        final startLabel = fmt.format(start);
-        final endLabel = fmt.format(end);
-        if (start.month == end.month) {
-          final s = DateFormat('MMMM yyyy', 'pt_BR').format(start);
-          return s[0].toUpperCase() + s.substring(1);
-        }
-        return '${startLabel[0].toUpperCase()}${startLabel.substring(1)} – ${endLabel[0].toUpperCase()}${endLabel.substring(1)} $year';
+        final end = DateTime(a.year, a.month + monthHorizon, 1)
+            .subtract(const Duration(days: 1));
+        final startFmt = DateFormat('MMMM yyyy', 'pt_BR').format(start);
+        final endFmt = DateFormat('MMMM yyyy', 'pt_BR').format(end);
+        final s = startFmt[0].toUpperCase() + startFmt.substring(1);
+        final e = endFmt[0].toUpperCase() + endFmt.substring(1);
+        return '$s – $e';
       }(),
     RentalOccupancyViewMode.year => DateFormat('yyyy').format(a),
   };
@@ -124,7 +157,7 @@ String rentalOccupancyNavTooltip(RentalOccupancyViewMode mode, int delta) {
   return switch (mode) {
     RentalOccupancyViewMode.day => '$word dia',
     RentalOccupancyViewMode.week => '$word semana',
-    RentalOccupancyViewMode.month => '$word mês',
+    RentalOccupancyViewMode.month => '$word $rentalOccupancyVisibleMonths meses',
     RentalOccupancyViewMode.year => '$word ano',
   };
 }

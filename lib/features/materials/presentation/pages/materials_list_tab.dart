@@ -7,6 +7,7 @@ import 'package:cond_manager/features/materials/presentation/utils/material_perm
 import 'package:cond_manager/shared/domain/enums/material_item_type.dart';
 import 'package:cond_manager/shared/domain/enums/service_type.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
+import 'package:cond_manager/shared/widgets/form/responsive_filter_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -121,23 +122,23 @@ class _FiltersBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Column(
-        children: [
-          condosAsync.when(
-            data: (condos) {
-              if (condos.isEmpty) return const SizedBox.shrink();
-              final items = [
-                const _CondoOpt(id: null, label: 'Todos'),
-                ...condos.map((c) => _CondoOpt(id: c.id, label: c.name)),
-              ];
-              final sel = items.firstWhere(
-                (o) => o.id == filter.condominiumId,
-                orElse: () => items.first,
-              );
-              return ClayDropdownField<_CondoOpt>(
+      child: condosAsync.when(
+        data: (condos) {
+          final condoItems = [
+            const _CondoOpt(id: null, label: 'Todos'),
+            ...condos.map((c) => _CondoOpt(id: c.id, label: c.name)),
+          ];
+          final selectedCondo = condoItems.firstWhere(
+            (o) => o.id == filter.condominiumId,
+            orElse: () => condoItems.first,
+          );
+
+          final fields = <Widget>[
+            if (condos.isNotEmpty)
+              ClayDropdownField<_CondoOpt>(
                 label: 'Condomínio',
-                value: sel,
-                items: items,
+                value: selectedCondo,
+                items: condoItems,
                 itemLabel: (o) => o.label,
                 onChanged: (v) => onFilterChanged(
                   filter.copyWith(
@@ -145,50 +146,40 @@ class _FiltersBar extends StatelessWidget {
                     clearCondominium: v?.id == null,
                   ),
                 ),
-              );
-            },
-            loading: () => const LinearProgressIndicator(),
-            error: (_, _) => const SizedBox.shrink(),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ClayDropdownField<ServiceType?>(
-                  label: 'Serviço',
-                  value: filter.serviceType,
-                  items: [null, ...ServiceType.values],
-                  itemLabel: (v) => v?.label ?? 'Todos',
-                  onChanged: (v) => onFilterChanged(
-                    filter.copyWith(
-                      serviceType: v,
-                      clearServiceType: v == null,
-                    ),
-                  ),
+              ),
+            ClayDropdownField<ServiceType?>(
+              label: 'Serviço',
+              value: filter.serviceType,
+              items: [null, ...ServiceType.values],
+              itemLabel: (v) => v?.label ?? 'Todos',
+              onChanged: (v) => onFilterChanged(
+                filter.copyWith(
+                  serviceType: v,
+                  clearServiceType: v == null,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ClayDropdownField<MaterialItemType?>(
-                  label: 'Tipo',
-                  value: filter.itemType,
-                  items: [null, ...MaterialItemType.values],
-                  itemLabel: (v) => v?.label ?? 'Todos',
-                  onChanged: (v) => onFilterChanged(
-                    filter.copyWith(itemType: v, clearItemType: v == null),
-                  ),
-                ),
+            ),
+            ClayDropdownField<MaterialItemType?>(
+              label: 'Tipo',
+              value: filter.itemType,
+              items: [null, ...MaterialItemType.values],
+              itemLabel: (v) => v?.label ?? 'Todos',
+              onChanged: (v) => onFilterChanged(
+                filter.copyWith(itemType: v, clearItemType: v == null),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Somente estoque baixo', style: TextStyle(fontSize: 13)),
-            value: filter.lowStockOnly,
-            onChanged: (v) => onFilterChanged(filter.copyWith(lowStockOnly: v)),
-          ),
-        ],
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Somente estoque baixo', style: TextStyle(fontSize: 13)),
+              value: filter.lowStockOnly,
+              onChanged: (v) => onFilterChanged(filter.copyWith(lowStockOnly: v)),
+            ),
+          ];
+
+          return ResponsiveFilterLayout(fields: fields, wideColumns: 3);
+        },
+        loading: () => const LinearProgressIndicator(),
+        error: (_, _) => const SizedBox.shrink(),
       ),
     );
   }

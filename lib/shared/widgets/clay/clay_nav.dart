@@ -77,7 +77,7 @@ class ClayBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -135,26 +135,41 @@ class _ClayNavTile extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
-          child: SizedBox(
-            height: 48,
-            child: Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 44,
-                height: 44,
-                decoration: selected
-                    ? BoxDecoration(
-                        color: ClayTokens.sidebarActive,
-                        shape: BoxShape.circle,
-                        boxShadow: ClayDecorations.softShadows(blur: 12, opacity: 0.15),
-                      )
-                    : null,
-                child: Icon(
-                  item.icon,
-                  size: 22,
-                  color: selected ? ClayTokens.accent : ClayTokens.sidebarMuted,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 40,
+                  height: 40,
+                  decoration: selected
+                      ? BoxDecoration(
+                          color: ClayTokens.sidebarActive,
+                          shape: BoxShape.circle,
+                          boxShadow: ClayDecorations.softShadows(blur: 12, opacity: 0.15),
+                        )
+                      : null,
+                  child: Icon(
+                    item.icon,
+                    size: 21,
+                    color: selected ? ClayTokens.accent : ClayTokens.sidebarMuted,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected ? ClayTokens.sidebarActive : ClayTokens.sidebarMuted,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

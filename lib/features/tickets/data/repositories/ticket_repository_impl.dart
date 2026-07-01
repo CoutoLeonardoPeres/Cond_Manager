@@ -423,12 +423,19 @@ class TicketRepositoryImpl implements TicketRepository {
   }
 
   @override
-  Future<Result<List<UnitOption>>> listUnits(String condominiumId) async {
+  Future<Result<List<UnitOption>>> listUnits(
+    String condominiumId, {
+    String? blockId,
+  }) async {
     try {
-      return Success(await _fetchUnits(condominiumId, withStructureLabels: true));
+      return Success(
+        await _fetchUnits(condominiumId, blockId: blockId, withStructureLabels: true),
+      );
     } on PostgrestException catch (e) {
       try {
-        return Success(await _fetchUnits(condominiumId, withStructureLabels: false));
+        return Success(
+          await _fetchUnits(condominiumId, blockId: blockId, withStructureLabels: false),
+        );
       } on PostgrestException {
         return Failure(_mapPostgrestError(e));
       }
@@ -439,18 +446,22 @@ class TicketRepositoryImpl implements TicketRepository {
 
   Future<List<UnitOption>> _fetchUnits(
     String condominiumId, {
+    String? blockId,
     required bool withStructureLabels,
   }) async {
     final select = withStructureLabels
         ? 'id, identifier, area_sqm, block:blocks(name), tower:towers(name)'
         : 'id, identifier, area_sqm';
 
-    final data = await _client
+    var query = _client
         .from('units')
         .select(select)
         .eq('condominium_id', condominiumId)
-        .eq('status', 'active')
-        .order('identifier');
+        .eq('status', 'active');
+    if (blockId != null) {
+      query = query.eq('block_id', blockId);
+    }
+    final data = await query.order('identifier');
 
     return (data as List<dynamic>)
         .map(

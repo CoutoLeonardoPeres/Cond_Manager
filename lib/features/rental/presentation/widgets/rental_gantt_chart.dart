@@ -43,11 +43,11 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
       day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
 
   /// Tom suave — identifica fim de semana sem parecer dia indisponível.
-  static Color _weekendTint({double alpha = 0.06}) =>
+  static Color _weekendTint({double alpha = 0.12}) =>
       ClayTokens.accentAlt.withValues(alpha: alpha);
 
   static Color _gridCellColor({required bool isWeekend, required bool oddRow}) {
-    if (isWeekend) return _weekendTint(alpha: oddRow ? 0.08 : 0.05);
+    if (isWeekend) return _weekendTint(alpha: oddRow ? 0.2 : 0.14);
     return oddRow ? ClayTokens.surfacePressed.withValues(alpha: 0.25) : Colors.transparent;
   }
 
@@ -65,6 +65,8 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
     super.initState();
     _headerHController.addListener(_syncHeaderToBody);
     _bodyHController.addListener(_syncBodyToHeader);
+    _bodyHController.addListener(_onHorizontalMetricsChanged);
+    _headerHController.addListener(_onHorizontalMetricsChanged);
     _bodyVController.addListener(_syncBodyVToLabels);
     _labelsVController.addListener(_syncLabelsToBodyV);
   }
@@ -123,6 +125,24 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
     _syncingV = false;
   }
 
+  void _onHorizontalMetricsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _applyHorizontalOffset(double offset) {
+    if (!_bodyHController.hasClients) return;
+    final max = _bodyHController.position.maxScrollExtent;
+    final clamped = offset.clamp(0.0, max);
+    _syncingH = true;
+    if (_bodyHController.offset != clamped) {
+      _bodyHController.jumpTo(clamped);
+    }
+    if (_headerHController.hasClients && _headerHController.offset != clamped) {
+      _headerHController.jumpTo(clamped);
+    }
+    _syncingH = false;
+  }
+
   void _scrollToToday(double colWidth, int colCount) {
     if (_didInitialScroll || !_bodyHController.hasClients) return;
     _didInitialScroll = true;
@@ -139,12 +159,17 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
     }
 
     final viewport = _bodyHController.position.viewportDimension;
-    final target = widget.viewMode == RentalOccupancyViewMode.month
-        ? targetIndex * colWidth
-        : (targetIndex * colWidth) - (viewport / 2) + (colWidth / 2);
+    final target = switch (widget.viewMode) {
+      RentalOccupancyViewMode.month => () {
+          final visibleDays = rentalOccupancyVisibleDayCount(widget.range.start);
+          if (targetIndex < visibleDays) return 0.0;
+          return ((targetIndex - visibleDays + 1) * colWidth)
+              .clamp(0.0, _bodyHController.position.maxScrollExtent);
+        }(),
+      _ => (targetIndex * colWidth) - (viewport / 2) + (colWidth / 2),
+    };
     final offset = target.clamp(0.0, _bodyHController.position.maxScrollExtent);
-    _bodyHController.jumpTo(offset);
-    _headerHController.jumpTo(offset);
+    _applyHorizontalOffset(offset);
   }
 
   double? _todayMarkerLeft(RentalOccupancyViewMode mode, double colWidth, int colCount) {
@@ -166,6 +191,7 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
           mode: widget.viewMode,
           viewportWidth: constraints.maxWidth,
           propertyColumnWidth: widget.propertyColumnWidth,
+          range: widget.range,
         );
         final colCount = rentalOccupancyColumnCount(widget.viewMode, widget.range);
         final timelineWidth = colCount * colWidth;
@@ -181,11 +207,16 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
         final todayLeft = _todayMarkerLeft(widget.viewMode, colWidth, colCount);
         final timelineViewportWidth =
             (constraints.maxWidth - widget.propertyColumnWidth).clamp(0.0, double.infinity);
+        final hOffset = _bodyHController.hasClients ? _bodyHController.offset : 0.0;
+        final hMaxScroll =
+            _bodyHController.hasClients ? _bodyHController.position.maxScrollExtent : 0.0;
         final showHorizontalBar = widget.viewMode != RentalOccupancyViewMode.day &&
-            timelineWidth > timelineViewportWidth + 1;
+            timelineWidth > timelineViewportWidth + 1 &&
+            hMaxScroll > 0;
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToToday(colWidth, colCount);
+          if (mounted) setState(() {});
         });
 
         return Column(
@@ -334,9 +365,11 @@ class _RentalGanttChartState extends State<RentalGanttChart> {
               Padding(
                 padding: EdgeInsets.only(left: widget.propertyColumnWidth),
                 child: _GanttHorizontalScrollbar(
-                  controller: _bodyHController,
+                  offset: hOffset,
+                  maxScroll: hMaxScroll,
                   contentWidth: timelineWidth,
                   viewportWidth: timelineViewportWidth,
+                  onOffsetChanged: _applyHorizontalOffset,
                 ),
               ),
             ],
@@ -402,16 +435,25 @@ class _OccupancyHeader extends StatelessWidget {
       required String? sublabel,
       required bool highlight,
       required bool weekend,
+      bool compact = false,
     }) {
+      final dayFontSize = compact
+          ? (colWidth < 14
+              ? 7.0
+              : colWidth < 18
+                  ? 8.0
+                  : 9.0)
+          : (colWidth < 24 ? 9.0 : 10.0);
+
       return Container(
         width: colWidth,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 1 : 4),
         decoration: BoxDecoration(
           color: highlight
               ? ClayTokens.primary.withValues(alpha: 0.12)
               : weekend
-                  ? _RentalGanttChartState._weekendTint(alpha: 0.07)
+                  ? _RentalGanttChartState._weekendTint(alpha: 0.16)
                   : ClayTokens.surfaceRaised,
           border: Border(
             right: BorderSide(color: border),
@@ -422,37 +464,55 @@ class _OccupancyHeader extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (sublabel != null)
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  sublabel,
+                  style: TextStyle(
+                    fontSize: compact ? 7 : 9,
+                    fontWeight: FontWeight.w600,
+                    color: highlight
+                        ? ClayTokens.primary
+                        : weekend
+                            ? ClayTokens.accentAlt
+                            : ClayTokens.textMuted,
+                  ),
+                ),
+              ),
+            if (viewMode == RentalOccupancyViewMode.day)
               Text(
-                sublabel,
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
                   color: highlight
                       ? ClayTokens.primary
                       : weekend
-                          ? ClayTokens.accentAlt.withValues(alpha: 0.9)
-                          : ClayTokens.textMuted,
+                          ? ClayTokens.accentAlt
+                          : ClayTokens.textPrimary,
+                ),
+              )
+            else
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: dayFontSize,
+                    fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
+                    color: highlight
+                        ? ClayTokens.primary
+                        : weekend
+                            ? ClayTokens.accentAlt
+                            : ClayTokens.textPrimary,
+                  ),
                 ),
               ),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: viewMode == RentalOccupancyViewMode.day ? 2 : 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: viewMode == RentalOccupancyViewMode.day
-                    ? 12
-                    : colWidth < 24
-                        ? 9
-                        : 10,
-                fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
-                color: highlight
-                    ? ClayTokens.primary
-                    : weekend
-                        ? ClayTokens.accentAlt.withValues(alpha: 0.95)
-                        : ClayTokens.textPrimary,
-              ),
-            ),
           ],
         ),
       );
@@ -524,11 +584,13 @@ class _OccupancyHeader extends StatelessWidget {
     final dayFmt = DateFormat('d');
     return SizedBox(
       width: width,
+      height: height,
       child: Column(
         children: [
           SizedBox(
             height: 30,
             child: Stack(
+              clipBehavior: Clip.none,
               children: [
                 for (final header in monthHeaders)
                   Positioned(
@@ -538,6 +600,7 @@ class _OccupancyHeader extends StatelessWidget {
                     bottom: 0,
                     child: Container(
                       alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
                         color: ClayTokens.surfaceRaised,
                         border: Border(
@@ -545,13 +608,15 @@ class _OccupancyHeader extends StatelessWidget {
                           bottom: BorderSide(color: border),
                         ),
                       ),
-                      child: Text(
-                        _capitalize(
-                          DateFormat('MMM yyyy', 'pt_BR')
-                              .format(DateTime(header.year, header.month)),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _capitalize(
+                            DateFormat('MMM yyyy', 'pt_BR')
+                                .format(DateTime(header.year, header.month)),
+                          ),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                         ),
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
@@ -559,7 +624,7 @@ class _OccupancyHeader extends StatelessWidget {
             ),
           ),
           SizedBox(
-            height: 28,
+            height: height - 30,
             child: Row(
               children: List.generate(colCount, (i) {
                 final day = range.start.add(Duration(days: i));
@@ -568,6 +633,7 @@ class _OccupancyHeader extends StatelessWidget {
                   label: dayFmt.format(day),
                   sublabel: null,
                   highlight: isToday,
+                  compact: true,
                   weekend:
                       day.weekday == DateTime.saturday || day.weekday == DateTime.sunday,
                 );
@@ -645,6 +711,9 @@ class _OccupancyGrid extends StatelessWidget {
                     border: Border(
                       right: BorderSide(color: borderColor.withValues(alpha: 0.6)),
                       bottom: BorderSide(color: borderColor.withValues(alpha: 0.6)),
+                      top: isWeekend
+                          ? BorderSide(color: ClayTokens.accentAlt.withValues(alpha: 0.35))
+                          : BorderSide.none,
                     ),
                   ),
                 ),
@@ -815,107 +884,89 @@ class _PropertyTimelineRow extends StatelessWidget {
 }
 
 /// Barra horizontal fixa no rodapé do Gantt — desliza os meses para a esquerda/direita.
-class _GanttHorizontalScrollbar extends StatefulWidget {
+class _GanttHorizontalScrollbar extends StatelessWidget {
   const _GanttHorizontalScrollbar({
-    required this.controller,
+    required this.offset,
+    required this.maxScroll,
     required this.contentWidth,
     required this.viewportWidth,
+    required this.onOffsetChanged,
   });
 
-  final ScrollController controller;
+  final double offset;
+  final double maxScroll;
   final double contentWidth;
   final double viewportWidth;
+  final ValueChanged<double> onOffsetChanged;
 
-  @override
-  State<_GanttHorizontalScrollbar> createState() => _GanttHorizontalScrollbarState();
-}
-
-class _GanttHorizontalScrollbarState extends State<_GanttHorizontalScrollbar> {
   static const _trackHeight = 14.0;
-  static const _minThumbWidth = 40.0;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onScroll);
-  }
-
-  @override
-  void didUpdateWidget(covariant _GanttHorizontalScrollbar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeListener(_onScroll);
-      widget.controller.addListener(_onScroll);
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onScroll);
-    super.dispose();
-  }
-
-  void _onScroll() => setState(() {});
-
-  void _jumpToThumbCenter(double localX, double trackWidth, double thumbWidth, double maxScroll) {
-    if (!widget.controller.hasClients || maxScroll <= 0) return;
-    final usable = trackWidth - thumbWidth;
-    if (usable <= 0) return;
-    final target = ((localX - thumbWidth / 2) / usable * maxScroll).clamp(0.0, maxScroll);
-    widget.controller.jumpTo(target);
-  }
 
   @override
   Widget build(BuildContext context) {
-    final maxScroll = widget.controller.hasClients ? widget.controller.position.maxScrollExtent : 0.0;
-    final offset = widget.controller.hasClients ? widget.controller.offset : 0.0;
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final trackWidth = constraints.maxWidth;
-        final thumbWidth = (widget.viewportWidth / widget.contentWidth * trackWidth)
-            .clamp(_minThumbWidth, trackWidth);
+        final scrollable = maxScroll > 0 && contentWidth > viewportWidth + 1;
+        final thumbRatio = scrollable ? (viewportWidth / contentWidth).clamp(0.08, 0.92) : 1.0;
+        final thumbWidth = (trackWidth * thumbRatio).clamp(28.0, trackWidth * 0.92);
         final usable = (trackWidth - thumbWidth).clamp(0.0, trackWidth);
-        final thumbLeft = maxScroll > 0 && usable > 0 ? (offset / maxScroll) * usable : 0.0;
+        final thumbLeft = scrollable && usable > 0 ? (offset / maxScroll) * usable : 0.0;
 
         return Semantics(
           label: 'Rolagem horizontal do mapa de ocupação',
           slider: true,
-          child: GestureDetector(
+          child: Listener(
             behavior: HitTestBehavior.opaque,
-            onHorizontalDragUpdate: (details) {
-              if (!widget.controller.hasClients || maxScroll <= 0 || usable <= 0) return;
-              final delta = details.delta.dx / usable * maxScroll;
-              widget.controller.jumpTo((widget.controller.offset + delta).clamp(0.0, maxScroll));
+            onPointerMove: (event) {
+              if (!scrollable || usable <= 0 || !event.down) return;
+              final delta = event.delta.dx / usable * maxScroll;
+              onOffsetChanged((offset + delta).clamp(0.0, maxScroll));
             },
-            onTapDown: (details) =>
-                _jumpToThumbCenter(details.localPosition.dx, trackWidth, thumbWidth, maxScroll),
-            child: MouseRegion(
-              cursor: SystemMouseCursors.grab,
-              child: Container(
-                height: _trackHeight,
-                decoration: BoxDecoration(
-                  color: ClayTokens.shadowDark.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
-                  border: Border.all(color: ClayTokens.shadowDark.withValues(alpha: 0.2)),
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned(
-                      left: thumbLeft,
-                      width: thumbWidth,
-                      top: 2,
-                      bottom: 2,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: ClayTokens.accent.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
-                          border: Border.all(color: ClayTokens.accent.withValues(alpha: 0.7)),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragUpdate: scrollable && usable > 0
+                  ? (details) {
+                      final delta = details.delta.dx / usable * maxScroll;
+                      onOffsetChanged((offset + delta).clamp(0.0, maxScroll));
+                    }
+                  : null,
+              onTapDown: scrollable && usable > 0
+                  ? (details) {
+                      final target =
+                          ((details.localPosition.dx - thumbWidth / 2) / usable * maxScroll)
+                              .clamp(0.0, maxScroll);
+                      onOffsetChanged(target);
+                    }
+                  : null,
+              child: MouseRegion(
+                cursor: scrollable ? SystemMouseCursors.grab : SystemMouseCursors.basic,
+                child: Container(
+                  height: _trackHeight,
+                  decoration: BoxDecoration(
+                    color: ClayTokens.shadowDark.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                    border: Border.all(color: ClayTokens.shadowDark.withValues(alpha: 0.2)),
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        left: thumbLeft,
+                        width: thumbWidth,
+                        top: 2,
+                        bottom: 2,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: ClayTokens.accent.withValues(alpha: scrollable ? 0.55 : 0.25),
+                            borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                            border: Border.all(
+                              color: ClayTokens.accent.withValues(alpha: scrollable ? 0.7 : 0.35),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

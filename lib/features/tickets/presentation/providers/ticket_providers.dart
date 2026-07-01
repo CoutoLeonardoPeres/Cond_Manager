@@ -73,6 +73,16 @@ final ticketUnitsProvider =
   );
 });
 
+final ticketUnitsByBlockProvider = FutureProvider.autoDispose
+    .family<List<UnitOption>, ({String condominiumId, String? blockId})>((ref, scope) async {
+  final repo = ref.watch(ticketRepositoryProvider);
+  final result = await repo.listUnits(scope.condominiumId, blockId: scope.blockId);
+  return result.when(
+    success: (list) => list,
+    failure: (e) => throw e,
+  );
+});
+
 final ticketCommonAreasProvider =
     FutureProvider.autoDispose.family<List<CommonAreaOption>, String>((ref, condominiumId) async {
   final repo = ref.watch(ticketRepositoryProvider);

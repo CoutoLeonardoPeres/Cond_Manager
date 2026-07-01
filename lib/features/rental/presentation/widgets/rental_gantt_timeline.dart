@@ -3,6 +3,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_lease.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
 import 'package:cond_manager/shared/domain/enums/rental_booking_status.dart';
 import 'package:cond_manager/shared/domain/enums/rental_lease_status.dart';
+import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
 import 'package:equatable/equatable.dart';
 
 /// Intervalo visível no gráfico (início inclusivo, fim exclusivo).
@@ -93,6 +94,15 @@ List<RentalGanttMonthHeader> rentalGanttMonthHeaders(RentalGanttRange range) {
   return headers;
 }
 
+/// Contrato ativo de longo prazo sem data de término não bloqueia o mapa de ocupação.
+bool rentalLeaseBlocksOccupancy(RentalLease lease) {
+  if (lease.status != RentalLeaseStatus.active) return false;
+  if (lease.endDate == null && lease.listingMode == RentalListingMode.longTerm) {
+    return false;
+  }
+  return true;
+}
+
 List<RentalGanttSegment> rentalGanttSegmentsForProperty({
   required String propertyId,
   required List<RentalBooking> bookings,
@@ -123,7 +133,7 @@ List<RentalGanttSegment> rentalGanttSegmentsForProperty({
 
   for (final lease in leases) {
     if (lease.propertyId != propertyId) continue;
-    if (lease.status != RentalLeaseStatus.active) continue;
+    if (!rentalLeaseBlocksOccupancy(lease)) continue;
     final leaseEnd = lease.endDate != null
         ? rentalGanttDateOnly(lease.endDate!).add(const Duration(days: 1))
         : range.end;
@@ -185,7 +195,7 @@ bool rentalPropertyIsOccupiedOnDate({
 
   for (final lease in leases) {
     if (lease.propertyId != propertyId) continue;
-    if (lease.status != RentalLeaseStatus.active) continue;
+    if (!rentalLeaseBlocksOccupancy(lease)) continue;
     final start = rentalGanttDateOnly(lease.startDate);
     if (day.isBefore(start)) continue;
     if (lease.endDate != null && day.isAfter(rentalGanttDateOnly(lease.endDate!))) {
@@ -215,4 +225,50 @@ List<RentalProperty> rentalVacantProperties({
   }).toList();
   vacant.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
   return vacant;
+}
+
+/// Imóvel com pelo menos um dia livre nos próximos [horizonMonths] meses.
+bool rentalPropertyHasVacancyInHorizon({
+  required String propertyId,
+  required List<RentalBooking> bookings,
+  required List<RentalLease> leases,
+  required int horizonMonths,
+  DateTime? from,
+}) {
+  final start = rentalGanttDateOnly(from ?? DateTime.now());
+  final end = DateTime(start.year, start.month + horizonMonths, start.day);
+  if (!end.isAfter(start)) return false;
+
+  for (var day = start; day.isBefore(end); day = day.add(const Duration(days: 1))) {
+    if (!rentalPropertyIsOccupiedOnDate(
+      propertyId: propertyId,
+      date: day,
+      bookings: bookings,
+      leases: leases,
+    )) {
+      return true;
+    }
+  }
+  return false;
+}
+
+List<RentalProperty> rentalPropertiesWithVacancyInHorizon({
+  required List<RentalProperty> properties,
+  required List<RentalBooking> bookings,
+  required List<RentalLease> leases,
+  required int horizonMonths,
+  DateTime? from,
+}) {
+  final list = properties.where((p) {
+    if (p.status != 'active') return false;
+    return rentalPropertyHasVacancyInHorizon(
+      propertyId: p.id,
+      bookings: bookings,
+      leases: leases,
+      horizonMonths: horizonMonths,
+      from: from,
+    );
+  }).toList();
+  list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+  return list;
 }

@@ -113,18 +113,28 @@ class RentalChargesPage extends ConsumerWidget {
 
                   return RefreshIndicator(
                     onRefresh: () async => ref.invalidate(rentalChargesListProvider),
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(20, 0, 20, canManage ? 88 : 24),
-                      child: RentalChargesBoard(
-                        charges: filtered,
-                        currency: currency,
-                        dateFmt: dateFmt,
-                        canManage: canManage,
-                        onOpenCharge: (charge) => context.go('/rental/charges/${charge.id}/edit'),
-                        onConfirmPayment: (charge) =>
-                            _confirmChargePayment(context, ref, charge),
-                      ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobile = constraints.maxWidth < 640;
+                        return SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(
+                            isMobile ? 10 : 20,
+                            0,
+                            isMobile ? 10 : 20,
+                            canManage ? 88 : 24,
+                          ),
+                          child: RentalChargesBoard(
+                            charges: filtered,
+                            currency: currency,
+                            dateFmt: dateFmt,
+                            canManage: canManage,
+                            onOpenCharge: (charge) => context.go('/rental/charges/${charge.id}/edit'),
+                            onConfirmPayment: (charge) =>
+                                _confirmChargePayment(context, ref, charge),
+                          ),
+                        );
+                      },
                     ),
                   );
                 },

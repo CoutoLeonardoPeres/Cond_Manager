@@ -1,20 +1,25 @@
+import 'dart:typed_data';
+
 import 'package:cond_manager/core/errors/app_exception.dart'
     show AppAuthException, AppException, NetworkException, PermissionException;
 import 'package:cond_manager/core/utils/result.dart';
 import 'package:cond_manager/features/financial/data/models/financial_record_model.dart';
 import 'package:cond_manager/features/financial/domain/entities/financial_record.dart';
 import 'package:cond_manager/features/financial/domain/repositories/financial_repository.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_expense_attachment.dart';
 import 'package:cond_manager/features/rental/domain/utils/rental_expense_allocation.dart';
 import 'package:cond_manager/shared/domain/enums/financial_category.dart';
 import 'package:cond_manager/shared/domain/enums/financial_record_type.dart';
 import 'package:cond_manager/shared/domain/enums/financial_scope.dart';
 import 'package:cond_manager/shared/domain/enums/rental_expense_entry_type.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 class FinancialRepositoryImpl implements FinancialRepository {
   FinancialRepositoryImpl(this._client);
 
   final SupabaseClient _client;
+  static const _expenseReceiptsBucket = 'rental-expense-receipts';
 
   @override
   Future<Result<List<FinancialRecord>>> list(FinancialListFilter filter) async {
@@ -148,8 +153,11 @@ class FinancialRepositoryImpl implements FinancialRepository {
           dupQuery = dupQuery.eq('description', source.description);
           if (source.unitId != null) {
             dupQuery = dupQuery.eq('unit_id', source.unitId!);
+          } else if (source.rentalPropertyId != null) {
+            dupQuery = dupQuery.eq('rental_property_id', source.rentalPropertyId!);
           } else {
             dupQuery = dupQuery.isFilter('unit_id', null);
+            dupQuery = dupQuery.isFilter('rental_property_id', null);
           }
           if (source.condominiumBillType != null) {
             dupQuery = dupQuery.eq('condominium_bill_type', source.condominiumBillType!.value);
@@ -170,11 +178,12 @@ class FinancialRepositoryImpl implements FinancialRepository {
           'record_type': FinancialRecordType.expense.value,
           'category': source.category.value,
           'description': source.description,
-          'amount': source.amount,
-          'tax_amount': source.taxAmount,
+          'amount': 0,
+          'tax_amount': 0,
           'reference_date': _dateStr(refDate),
           if (dueDate != null) 'due_date': _dateStr(dueDate),
-          'unit_id': source.unitId,
+          if (source.unitId != null) 'unit_id': source.unitId,
+          if (source.rentalPropertyId != null) 'rental_property_id': source.rentalPropertyId,
           if (source.blockId != null) 'block_id': source.blockId,
           'rental_expense_entry_type': source.rentalExpenseEntryType!.value,
           if (source.condominiumBillType != null)
@@ -270,35 +279,35 @@ class FinancialRepositoryImpl implements FinancialRepository {
         return const Failure(NetworkException('Esta despesa já foi rateada entre unidades.'));
       }
 
-      final unitsData = await _client
-          .from('units')
-          .select('id, identifier, area_sqm')
-          .eq('condominium_id', p.condominiumId!)
-          .eq('status', 'active')
-          .order('identifier');
-
-      final units = unitsData as List<dynamic>;
-      if (units.isEmpty) {
-        return const Failure(NetworkException('Nenhuma unidade ativa neste condomínio.'));
+      final targetsResult = await _loadRentalExpenseAllocationTargets(p);
+      List<RentalExpenseAllocationTarget>? targets;
+      AppException? targetsError;
+      targetsResult.when(
+        success: (list) => targets = list,
+        failure: (e) => targetsError = e,
+      );
+      if (targetsError != null) return Failure(targetsError!);
+      final allocationTargets = targets!;
+      if (allocationTargets.isEmpty) {
+        return const Failure(
+          NetworkException('Nenhuma unidade ou imóvel ativo neste condomínio.'),
+        );
       }
 
       final weights = <({String unitId, double weight})>[];
-      for (final row in units) {
-        final id = row['id'] as String;
+      for (final target in allocationTargets) {
         if (method == RentalExpenseAllocationMethod.byArea.value) {
-          final area = row['area_sqm'] != null
-              ? double.tryParse(row['area_sqm'].toString()) ?? 0
-              : 0;
+          final area = target.areaSqm ?? 0;
           if (area <= 0) {
             return const Failure(
               NetworkException(
-                'Rateio por metragem exige área (m²) cadastrada em todas as unidades.',
+                'Rateio por metragem exige área (m²) cadastrada em todas as unidades/imóveis.',
               ),
             );
           }
-          weights.add((unitId: id, weight: area.toDouble()));
+          weights.add((unitId: target.id, weight: area));
         } else {
-          weights.add((unitId: id, weight: 1.0));
+          weights.add((unitId: target.id, weight: 1.0));
         }
       }
 
@@ -308,10 +317,8 @@ class FinancialRepositoryImpl implements FinancialRepository {
       );
 
       final created = <FinancialRecord>[];
-      for (final row in units) {
-        final unitId = row['id'] as String;
-        final identifier = row['identifier'] as String;
-        final amount = shares[unitId] ?? 0;
+      for (final target in allocationTargets) {
+        final amount = shares[target.id] ?? 0;
         if (amount <= 0) continue;
 
         final input = FinancialRecordCreateInput(
@@ -319,14 +326,15 @@ class FinancialRepositoryImpl implements FinancialRepository {
           condominiumId: p.condominiumId,
           recordType: p.recordType,
           category: p.category,
-          description: '${p.description} — $identifier',
+          description: '${p.description} — ${target.label}',
           amount: amount,
           taxAmount: 0,
           referenceDate: p.referenceDate,
           dueDate: p.dueDate,
           paidAt: p.paidAt,
           notes: p.notes,
-          unitId: unitId,
+          unitId: target.unitId,
+          rentalPropertyId: target.rentalPropertyId,
           rentalExpenseEntryType: p.rentalExpenseEntryType,
           condominiumBillType: p.condominiumBillType,
           expenseServiceType: p.expenseServiceType,
@@ -381,6 +389,9 @@ class FinancialRepositoryImpl implements FinancialRepository {
 
       if (input.scope == FinancialScope.condominium && input.condominiumId == null) {
         return const Failure(NetworkException('Selecione o condomínio.'));
+      }
+      if (input.scope == FinancialScope.managementCompany && input.managementCompanyId == null) {
+        return const Failure(NetworkException('Empresa gestora não identificada.'));
       }
 
       final row = await _client
@@ -536,6 +547,174 @@ class FinancialRepositoryImpl implements FinancialRepository {
       totalPersonnel: personnel,
       recordCount: records.length,
       byCategory: breakdown,
+    );
+  }
+
+  Future<Result<List<RentalExpenseAllocationTarget>>> _loadRentalExpenseAllocationTargets(
+    FinancialRecord parent,
+  ) async {
+    try {
+      var unitsQuery = _client
+          .from('units')
+          .select('id, identifier, area_sqm')
+          .eq('condominium_id', parent.condominiumId!)
+          .eq('status', 'active');
+      if (parent.blockId != null) {
+        unitsQuery = unitsQuery.eq('block_id', parent.blockId!);
+      }
+      final unitsData = await unitsQuery.order('identifier');
+      final units = unitsData as List<dynamic>;
+      if (units.isNotEmpty) {
+        return Success(
+          units
+              .map(
+                (row) => RentalExpenseAllocationTarget(
+                  id: row['id'] as String,
+                  label: row['identifier'] as String,
+                  areaSqm: row['area_sqm'] != null
+                      ? double.tryParse(row['area_sqm'].toString())
+                      : null,
+                  unitId: row['id'] as String,
+                ),
+              )
+              .toList(),
+        );
+      }
+
+      final propertiesData = await _client
+          .from('rental_properties')
+          .select('id, title, area_sqm')
+          .eq('condominium_id', parent.condominiumId!)
+          .eq('status', 'active')
+          .order('title');
+      final properties = propertiesData as List<dynamic>;
+      return Success(
+        properties
+            .map(
+              (row) => RentalExpenseAllocationTarget(
+                id: row['id'] as String,
+                label: row['title'] as String,
+                areaSqm: row['area_sqm'] != null
+                    ? double.tryParse(row['area_sqm'].toString())
+                    : null,
+                rentalPropertyId: row['id'] as String,
+              ),
+            )
+            .toList(),
+      );
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao carregar destinos de rateio: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<RentalExpenseAttachment>>> listRentalExpenseAttachments(
+    String financialRecordId,
+  ) async {
+    try {
+      final data = await _client
+          .from('rental_expense_attachments')
+          .select()
+          .eq('financial_record_id', financialRecordId)
+          .order('created_at');
+
+      final attachments = <RentalExpenseAttachment>[];
+      for (final raw in data as List<dynamic>) {
+        final map = raw as Map<String, dynamic>;
+        var url = map['file_url'] as String? ?? '';
+        final path = map['file_path'] as String? ?? '';
+        if (path.isNotEmpty) {
+          url = await _client.storage.from(_expenseReceiptsBucket).createSignedUrl(path, 3600);
+        }
+        attachments.add(_attachmentFromMap(map, fileUrl: url));
+      }
+      return Success(attachments);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao listar anexos: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> uploadRentalExpenseAttachments({
+    required String financialRecordId,
+    required String companyId,
+    required List<PendingRentalExpenseAttachment> files,
+  }) async {
+    if (files.isEmpty) return const Success(null);
+
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        return const Failure(AppAuthException('Usuário não autenticado.'));
+      }
+
+      const uuid = Uuid();
+      for (final file in files) {
+        final safeName = file.fileName.replaceAll(RegExp(r'[^\w.\-]'), '_');
+        final path = '$companyId/$financialRecordId/${uuid.v4()}_$safeName';
+
+        await _client.storage.from(_expenseReceiptsBucket).uploadBinary(
+              path,
+              file.bytes,
+              fileOptions: FileOptions(contentType: file.mimeType, upsert: false),
+            );
+
+        final signedUrl =
+            await _client.storage.from(_expenseReceiptsBucket).createSignedUrl(path, 86400);
+
+        await _client.from('rental_expense_attachments').insert({
+          'financial_record_id': financialRecordId,
+          'company_id': companyId,
+          'file_url': signedUrl,
+          'file_path': path,
+          'file_name': file.fileName,
+          'mime_type': file.mimeType,
+          'uploaded_by': userId,
+        });
+      }
+
+      return const Success(null);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao enviar anexos: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> deleteRentalExpenseAttachment(
+    RentalExpenseAttachment attachment,
+  ) async {
+    try {
+      if (attachment.filePath.isNotEmpty) {
+        await _client.storage.from(_expenseReceiptsBucket).remove([attachment.filePath]);
+      }
+      await _client.from('rental_expense_attachments').delete().eq('id', attachment.id);
+      return const Success(null);
+    } on PostgrestException catch (e) {
+      return Failure(_mapError(e));
+    } catch (e) {
+      return Failure(NetworkException('Erro ao remover anexo: $e'));
+    }
+  }
+
+  RentalExpenseAttachment _attachmentFromMap(
+    Map<String, dynamic> map, {
+    required String fileUrl,
+  }) {
+    return RentalExpenseAttachment(
+      id: map['id'] as String,
+      financialRecordId: map['financial_record_id'] as String,
+      companyId: map['company_id'] as String,
+      fileUrl: fileUrl,
+      filePath: map['file_path'] as String? ?? '',
+      fileName: map['file_name'] as String?,
+      mimeType: map['mime_type'] as String?,
+      createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
 

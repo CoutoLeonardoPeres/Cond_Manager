@@ -5,6 +5,7 @@ import 'package:cond_manager/features/rental/domain/entities/rental_lease_list_f
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_list_filters_bar.dart';
 import 'package:cond_manager/shared/domain/enums/rental_lease_status.dart';
+import 'package:cond_manager/shared/widgets/form/responsive_filter_layout.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,56 +76,34 @@ class RentalLeasesPage extends ConsumerWidget {
                     style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 12),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      const minGridWidth = 720.0;
-                      final gridWidth = constraints.maxWidth < minGridWidth
-                          ? minGridWidth
-                          : constraints.maxWidth;
-
-                      final grid = FormGrid(
-                        columns: 3,
-                        items: [
-                          FormGridField(
-                            child: ClayTextField(
-                              label: 'Pesquisar',
-                              hint: 'Inquilino, imóvel ou nº do contrato…',
-                              prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                              onChanged: (v) =>
-                                  ref.read(rentalLeaseSearchQueryProvider.notifier).state = v,
-                            ),
-                          ),
-                          FormGridField(
-                            child: RentalMonthFilterBar(
-                              compact: true,
-                              month: filter.month,
-                              onChanged: (m) => updateFilter(
-                                filter.copyWith(month: m, clearMonth: m == null),
-                              ),
-                            ),
-                          ),
-                          FormGridField(
-                            child: ClayDropdownField<RentalLeaseStatus?>(
-                              label: 'Status',
-                              value: filter.status,
-                              items: [null, ...RentalLeaseStatus.values],
-                              itemLabel: (s) => s?.label ?? 'Todos',
-                              onChanged: (s) => updateFilter(
-                                filter.copyWith(status: s, clearStatus: s == null),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-
-                      if (constraints.maxWidth < minGridWidth) {
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SizedBox(width: gridWidth, child: grid),
-                        );
-                      }
-                      return grid;
-                    },
+                  ResponsiveFilterLayout(
+                    wideBreakpoint: 720,
+                    wideColumns: 3,
+                    fields: [
+                      ClayTextField(
+                        label: 'Pesquisar',
+                        hint: 'Inquilino, imóvel ou nº do contrato…',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        onChanged: (v) =>
+                            ref.read(rentalLeaseSearchQueryProvider.notifier).state = v,
+                      ),
+                      RentalMonthFilterBar(
+                        compact: true,
+                        month: filter.month,
+                        onChanged: (m) => updateFilter(
+                          filter.copyWith(month: m, clearMonth: m == null),
+                        ),
+                      ),
+                      ClayDropdownField<RentalLeaseStatus?>(
+                        label: 'Status',
+                        value: filter.status,
+                        items: [null, ...RentalLeaseStatus.values],
+                        itemLabel: (s) => s?.label ?? 'Todos',
+                        onChanged: (s) => updateFilter(
+                          filter.copyWith(status: s, clearStatus: s == null),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

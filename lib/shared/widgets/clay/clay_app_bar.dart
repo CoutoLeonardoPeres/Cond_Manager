@@ -19,16 +19,21 @@ class ClayAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isCompact = width < 600;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: EdgeInsets.fromLTRB(isCompact ? 12 : 20, 8, isCompact ? 8 : 20, 0),
       child: Row(
         children: [
           if (leading != null) leading!,
           Expanded(
             child: Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: AppTypography.heading(
-                fontSize: 20,
+                fontSize: isCompact ? 17 : 20,
                 fontWeight: FontWeight.w700,
                 color: ClayTokens.foreground,
               ),

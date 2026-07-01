@@ -41,7 +41,10 @@ abstract class TicketRepository {
 
   Future<Result<List<TicketAttachment>>> listAttachments(String ticketId);
 
-  Future<Result<List<UnitOption>>> listUnits(String condominiumId);
+  Future<Result<List<UnitOption>>> listUnits(
+    String condominiumId, {
+    String? blockId,
+  });
 
   Future<Result<List<CommonAreaOption>>> listCommonAreas(String condominiumId);
 }

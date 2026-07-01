@@ -255,6 +255,8 @@ class FinancialRecordModel {
       'condominium_id': input.scope == FinancialScope.condominium
           ? input.condominiumId
           : null,
+      if (input.scope == FinancialScope.managementCompany)
+        'management_company_id': input.managementCompanyId,
       'record_type': input.recordType.value,
       'category': input.category.value,
       'description': input.description.trim(),

@@ -1,4 +1,5 @@
 import 'package:cond_manager/core/router/navigation_helpers.dart';
+import 'package:cond_manager/features/auth/presentation/providers/auth_providers.dart';
 import 'package:cond_manager/features/condominiums/domain/entities/condominium.dart';
 import 'package:cond_manager/features/condominiums/presentation/providers/condominium_providers.dart';
 import 'package:cond_manager/features/financial/domain/entities/financial_record.dart';
@@ -158,10 +159,20 @@ class _FinancialFormPageState extends ConsumerState<FinancialFormPage> {
         }),
       );
     } else {
+      final companyId = ref.read(currentProfileProvider).value?.companyId;
+      if (_scope == FinancialScope.managementCompany && companyId == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Sua conta não está vinculada a uma empresa gestora.';
+        });
+        return;
+      }
       final result = await repo.create(
         FinancialRecordCreateInput(
           scope: _scope,
           condominiumId: _condominium?.id,
+          managementCompanyId:
+              _scope == FinancialScope.managementCompany ? companyId : null,
           recordType: _recordType,
           category: _category,
           description: _descriptionController.text,

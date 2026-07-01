@@ -1,5 +1,6 @@
 import 'package:cond_manager/shared/domain/enums/rental_booking_channel.dart';
 import 'package:cond_manager/shared/domain/enums/rental_booking_status.dart';
+import 'package:cond_manager/shared/domain/enums/rental_listing_mode.dart';
 import 'package:equatable/equatable.dart';
 
 class RentalBooking extends Equatable {
@@ -8,6 +9,7 @@ class RentalBooking extends Equatable {
     required this.companyId,
     required this.propertyId,
     required this.propertyTitle,
+    this.propertyListingMode,
     this.unitId,
     this.bookingNumber,
     required this.channel,
@@ -33,6 +35,7 @@ class RentalBooking extends Equatable {
   final String companyId;
   final String propertyId;
   final String propertyTitle;
+  final RentalListingMode? propertyListingMode;
   final String? unitId;
   final String? bookingNumber;
   final RentalBookingChannel channel;

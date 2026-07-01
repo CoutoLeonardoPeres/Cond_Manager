@@ -1,9 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:cond_manager/features/financial/domain/entities/financial_record.dart';
 import 'package:cond_manager/features/financial/presentation/providers/financial_providers.dart';
 import 'package:cond_manager/features/rental/domain/utils/rental_expense_allocation.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
-import 'package:cond_manager/features/tickets/domain/entities/ticket.dart';
-import 'package:cond_manager/features/tickets/presentation/providers/ticket_providers.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +28,8 @@ class RentalExpenseAllocateSheet extends ConsumerStatefulWidget {
       );
     }
 
+    final maxHeight = math.min(720.0, MediaQuery.sizeOf(context).height * 0.85);
+
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -35,8 +37,11 @@ class RentalExpenseAllocateSheet extends ConsumerStatefulWidget {
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 720),
-          child: RentalExpenseAllocateSheet(expense: expense),
+          constraints: BoxConstraints(maxWidth: 640, maxHeight: maxHeight),
+          child: SizedBox(
+            height: maxHeight,
+            child: RentalExpenseAllocateSheet(expense: expense),
+          ),
         ),
       ),
     );
@@ -51,19 +56,21 @@ class _RentalExpenseAllocateSheetState extends ConsumerState<RentalExpenseAlloca
   bool _loading = false;
   String? _error;
 
-  List<({String unitId, String label, double weight})> _weights(List<UnitOption> units) {
-    return units.map((u) {
+  List<({String unitId, String label, double weight})> _weights(
+    List<RentalExpenseAllocationTarget> targets,
+  ) {
+    return targets.map((target) {
       final weight = _method == RentalExpenseAllocationMethod.byArea
-          ? (u.areaSqm ?? 0)
+          ? (target.areaSqm ?? 0)
           : 1.0;
-      return (unitId: u.id, label: u.label, weight: weight);
+      return (unitId: target.id, label: target.label, weight: weight);
     }).toList();
   }
 
-  Future<void> _confirm(List<UnitOption> units) async {
+  Future<void> _confirm(List<RentalExpenseAllocationTarget> targets) async {
     if (_method == RentalExpenseAllocationMethod.byArea &&
-        units.any((u) => u.areaSqm == null || u.areaSqm! <= 0)) {
-      setState(() => _error = 'Todas as unidades precisam de metragem (m²) cadastrada.');
+        targets.any((t) => t.areaSqm == null || t.areaSqm! <= 0)) {
+      setState(() => _error = 'Todos os destinos precisam de metragem (m²) cadastrada.');
       return;
     }
 
@@ -101,9 +108,16 @@ class _RentalExpenseAllocateSheetState extends ConsumerState<RentalExpenseAlloca
   Widget build(BuildContext context) {
     final currency = NumberFormat.simpleCurrency(locale: 'pt_BR');
     final condoId = widget.expense.condominiumId;
-    final unitsAsync = condoId != null
-        ? ref.watch(ticketUnitsProvider(condoId))
-        : const AsyncValue<List<UnitOption>>.data([]);
+    final targetsAsync = condoId != null
+        ? ref.watch(
+            rentalExpenseAllocationTargetsProvider(
+              RentalExpenseAllocationScope(
+                condominiumId: condoId,
+                blockId: widget.expense.blockId,
+              ),
+            ),
+          )
+        : const AsyncValue<List<RentalExpenseAllocationTarget>>.data([]);
 
     return ClaySurface(
       depth: ClayDepth.raised,
@@ -139,17 +153,17 @@ class _RentalExpenseAllocateSheetState extends ConsumerState<RentalExpenseAlloca
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: unitsAsync.when(
+            child: targetsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
               error: (e, _) => Center(child: Text('$e')),
-              data: (units) {
-                if (units.isEmpty) {
+              data: (targets) {
+                if (targets.isEmpty) {
                   return const Center(
-                    child: Text('Nenhuma unidade ativa neste condomínio.'),
+                    child: Text('Nenhuma unidade ou imóvel ativo neste condomínio.'),
                   );
                 }
 
-                final weighted = _weights(units);
+                final weighted = _weights(targets);
                 final shares = computeUnitAllocationShares(
                   totalAmount: widget.expense.totalWithTax,
                   units: weighted.map((w) => (unitId: w.unitId, weight: w.weight)).toList(),
@@ -190,12 +204,12 @@ class _RentalExpenseAllocateSheetState extends ConsumerState<RentalExpenseAlloca
             Text(_error!, style: const TextStyle(color: ClayTokens.error)),
           ],
           const SizedBox(height: 12),
-          unitsAsync.maybeWhen(
-            data: (units) => ClayButton(
+          targetsAsync.maybeWhen(
+            data: (targets) => ClayButton(
               label: 'Confirmar rateio',
               icon: Icons.account_balance_rounded,
               isLoading: _loading,
-              onPressed: _loading || units.isEmpty ? null : () => _confirm(units),
+              onPressed: _loading || targets.isEmpty ? null : () => _confirm(targets),
             ),
             orElse: () => const SizedBox.shrink(),
           ),

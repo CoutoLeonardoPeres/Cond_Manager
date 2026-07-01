@@ -13,12 +13,15 @@ import 'package:cond_manager/features/rental/domain/entities/rental_booking_sear
 import 'package:cond_manager/features/rental/domain/entities/rental_lease_list_filter.dart';
 import 'package:cond_manager/features/financial/domain/entities/financial_record.dart';
 import 'package:cond_manager/features/financial/presentation/providers/financial_providers.dart';
+import 'package:cond_manager/features/rental/domain/entities/rental_expense_attachment.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_expense_list_filter.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_property.dart';
 import 'package:cond_manager/features/rental/domain/repositories/rental_repository.dart';
+import 'package:cond_manager/features/rental/domain/utils/rental_expense_allocation.dart';
 import 'package:cond_manager/features/rental/domain/utils/rental_expense_due_alerts.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_gantt_timeline.dart';
 import 'package:cond_manager/features/rental/presentation/widgets/rental_occupancy_view.dart';
+import 'package:cond_manager/features/tickets/presentation/providers/ticket_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final rentalRepositoryProvider = Provider<RentalRepository>((ref) {
@@ -70,10 +73,15 @@ final rentalOccupancyAnchorProvider = StateProvider<DateTime>(
   },
 );
 
+final rentalOccupancyHorizonMonthsProvider = StateProvider<int>(
+  (ref) => rentalOccupancyDefaultHorizonMonths,
+);
+
 final rentalOccupancyRangeProvider = Provider<RentalGanttRange>((ref) {
   final mode = ref.watch(rentalOccupancyViewModeProvider);
   final anchor = ref.watch(rentalOccupancyAnchorProvider);
-  return rentalOccupancyRangeFor(mode, anchor);
+  final horizonMonths = ref.watch(rentalOccupancyHorizonMonthsProvider);
+  return rentalOccupancyRangeFor(mode, anchor, monthHorizon: horizonMonths);
 });
 
 final rentalGanttBookingsProvider =
@@ -105,6 +113,34 @@ final rentalPropertiesByCondominiumProvider =
         RentalPropertyListFilter(condominiumId: condominiumId),
       );
   return result.when(success: (l) => l, failure: (e) => throw e);
+});
+
+/// Destinos de rateio: unidades do condomínio; se vazio, imóveis de locação ativos.
+final rentalExpenseAllocationTargetsProvider = FutureProvider.autoDispose
+    .family<List<RentalExpenseAllocationTarget>, RentalExpenseAllocationScope>((ref, scope) async {
+  final units = await ref.watch(
+    ticketUnitsByBlockProvider(
+      (condominiumId: scope.condominiumId, blockId: scope.blockId),
+    ).future,
+  );
+  if (units.isNotEmpty) {
+    return units.map(RentalExpenseAllocationTarget.fromUnit).toList();
+  }
+
+  final properties = await ref.watch(
+    rentalPropertiesByCondominiumProvider(scope.condominiumId).future,
+  );
+  return properties
+      .where((p) => p.status == 'active')
+      .map(RentalExpenseAllocationTarget.fromProperty)
+      .toList();
+});
+
+final rentalExpenseAttachmentsProvider = FutureProvider.autoDispose
+    .family<List<RentalExpenseAttachment>, String>((ref, expenseId) async {
+  final result =
+      await ref.watch(financialRepositoryProvider).listRentalExpenseAttachments(expenseId);
+  return result.when(success: (items) => items, failure: (e) => throw e);
 });
 
 final rentalPropertyDetailProvider =
@@ -146,6 +182,13 @@ final rentalLeaseDetailProvider =
 final rentalBookingsListProvider =
     FutureProvider.autoDispose<List<RentalBooking>>((ref) async {
   final result = await ref.watch(rentalRepositoryProvider).listBookings();
+  return result.when(success: (l) => l, failure: (e) => throw e);
+});
+
+/// Reservas de hospedagem curta — exclui aluguel fixo / longo prazo (tela de contratos).
+final rentalShortStayBookingsListProvider =
+    FutureProvider.autoDispose<List<RentalBooking>>((ref) async {
+  final result = await ref.watch(rentalRepositoryProvider).listBookings(shortStayOnly: true);
   return result.when(success: (l) => l, failure: (e) => throw e);
 });
 

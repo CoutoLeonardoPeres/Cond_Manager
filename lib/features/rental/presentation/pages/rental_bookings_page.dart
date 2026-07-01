@@ -4,6 +4,7 @@ import 'package:cond_manager/features/auth/presentation/providers/auth_providers
 import 'package:cond_manager/features/rental/domain/entities/rental_booking.dart';
 import 'package:cond_manager/features/rental/domain/entities/rental_booking_search_filter.dart';
 import 'package:cond_manager/features/rental/presentation/providers/rental_providers.dart';
+import 'package:cond_manager/shared/widgets/form/responsive_filter_layout.dart';
 import 'package:cond_manager/shared/widgets/clay/clay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,7 +60,7 @@ class _RentalBookingsPageState extends ConsumerState<RentalBookingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bookingsAsync = ref.watch(rentalBookingsListProvider);
+    final bookingsAsync = ref.watch(rentalShortStayBookingsListProvider);
     final searchFilter = ref.watch(rentalBookingSearchFilterProvider);
     final dateFmt = DateFormat('dd/MM/yyyy');
     final currency = NumberFormat.simpleCurrency(locale: 'pt_BR');
@@ -87,77 +88,52 @@ class _RentalBookingsPageState extends ConsumerState<RentalBookingsPage> {
                     style: TextStyle(color: ClayTokens.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 12),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      const minGridWidth = 880.0;
-                      final gridWidth = constraints.maxWidth < minGridWidth
-                          ? minGridWidth
-                          : constraints.maxWidth;
-
-                      final grid = FormGrid(
-                        columns: 4,
-                        items: [
-                          FormGridField(
-                            child: ClayTextField(
-                              controller: _nameController,
-                              label: 'Nome',
-                              hint: 'Hóspede',
-                              prefixIcon: const Icon(Icons.person_search_rounded, size: 20),
-                              onChanged: (v) => _updateSearch(searchFilter.copyWith(name: v)),
-                            ),
-                          ),
-                          FormGridField(
-                            child: ClayTextField(
-                              controller: _cpfController,
-                              label: 'CPF',
-                              hint: '000.000.000-00',
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [CpfMaskFormatter()],
-                              onChanged: (v) => _updateSearch(searchFilter.copyWith(cpf: v)),
-                            ),
-                          ),
-                          FormGridField(
-                            child: ClayTextField(
-                              controller: _phoneController,
-                              label: 'Telefone',
-                              hint: '(00) 00000-0000',
-                              keyboardType: TextInputType.phone,
-                              inputFormatters: [PhoneMaskFormatter()],
-                              onChanged: (v) => _updateSearch(searchFilter.copyWith(phone: v)),
-                            ),
-                          ),
-                          FormGridField(
-                            child: ClayTextField(
-                              controller: _emailController,
-                              label: 'E-mail',
-                              hint: 'email@exemplo.com',
-                              keyboardType: TextInputType.emailAddress,
-                              onChanged: (v) => _updateSearch(searchFilter.copyWith(email: v)),
-                            ),
-                          ),
-                        ],
-                      );
-
-                      if (constraints.maxWidth < minGridWidth) {
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SizedBox(width: gridWidth, child: grid),
-                        );
-                      }
-                      return grid;
-                    },
-                  ),
-                  if (searchFilter.hasActiveFilters) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: _clearFilters,
-                        icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
-                        label: const Text('Limpar filtros'),
+                  ResponsiveFilterLayout(
+                    wideBreakpoint: 880,
+                    wideColumns: 4,
+                    fields: [
+                      ClayTextField(
+                        controller: _nameController,
+                        label: 'Nome',
+                        hint: 'Hóspede',
+                        prefixIcon: const Icon(Icons.person_search_rounded, size: 20),
+                        onChanged: (v) => _updateSearch(searchFilter.copyWith(name: v)),
                       ),
-                    ),
-                  ],
+                      ClayTextField(
+                        controller: _cpfController,
+                        label: 'CPF',
+                        hint: '000.000.000-00',
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [CpfMaskFormatter()],
+                        onChanged: (v) => _updateSearch(searchFilter.copyWith(cpf: v)),
+                      ),
+                      ClayTextField(
+                        controller: _phoneController,
+                        label: 'Telefone',
+                        hint: '(00) 00000-0000',
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [PhoneMaskFormatter()],
+                        onChanged: (v) => _updateSearch(searchFilter.copyWith(phone: v)),
+                      ),
+                      ClayTextField(
+                        controller: _emailController,
+                        label: 'E-mail',
+                        hint: 'email@exemplo.com',
+                        keyboardType: TextInputType.emailAddress,
+                        onChanged: (v) => _updateSearch(searchFilter.copyWith(email: v)),
+                      ),
+                    ],
+                    trailing: searchFilter.hasActiveFilters
+                        ? Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: _clearFilters,
+                              icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
+                              label: const Text('Limpar filtros'),
+                            ),
+                          )
+                        : null,
+                  ),
                 ],
               ),
             ),
@@ -167,24 +143,11 @@ class _RentalBookingsPageState extends ConsumerState<RentalBookingsPage> {
                 error: (e, _) => Center(child: Text('$e')),
                 data: (bookings) {
                   if (bookings.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Nenhuma reserva cadastrada.',
-                            style: TextStyle(color: ClayTokens.textSecondary),
-                          ),
-                          if (canCreate) ...[
-                            const SizedBox(height: 16),
-                            ClayButton(
-                              label: 'Nova reserva',
-                              expand: false,
-                              icon: Icons.add_rounded,
-                              onPressed: () => context.go('/rental/bookings/new'),
-                            ),
-                          ],
-                        ],
+                    return const Center(
+                      child: Text(
+                        'Nenhuma reserva cadastrada.',
+                        style: TextStyle(color: ClayTokens.textSecondary),
+                        textAlign: TextAlign.center,
                       ),
                     );
                   }
@@ -213,7 +176,7 @@ class _RentalBookingsPageState extends ConsumerState<RentalBookingsPage> {
                   }
 
                   return RefreshIndicator(
-                    onRefresh: () async => ref.invalidate(rentalBookingsListProvider),
+                    onRefresh: () async => ref.invalidate(rentalShortStayBookingsListProvider),
                     child: ListView.separated(
                       padding: EdgeInsets.fromLTRB(20, 0, 20, canCreate ? 88 : 24),
                       itemCount: filtered.length,

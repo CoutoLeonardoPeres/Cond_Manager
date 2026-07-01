@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O Cond Manager precisa acessar fotos para anexar imagens a chamados e ordens de serviço.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>O Cond Manager precisa usar a câmera para registrar fotos em chamados e ordens de serviço.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>O Cond Manager pode usar o microfone ao gravar vídeos para anexos.</string>
 </dict>
 </plist>

@@ -75,6 +75,7 @@ abstract class RentalRepository {
     DateTime? from,
     DateTime? to,
     String? propertyId,
+    bool shortStayOnly = false,
   });
 
   Future<Result<RentalBooking>> getBooking(String id);

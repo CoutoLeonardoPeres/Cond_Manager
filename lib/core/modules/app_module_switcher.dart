@@ -1,6 +1,7 @@
 import 'package:cond_manager/core/modules/app_module_providers.dart';
 import 'package:cond_manager/core/modules/company_module_access.dart';
 import 'package:cond_manager/core/permissions/app_permissions.dart';
+import 'package:cond_manager/core/theme/app_typography.dart';
 import 'package:cond_manager/core/theme/clay_decorations.dart';
 import 'package:cond_manager/core/theme/clay_tokens.dart';
 import 'package:cond_manager/features/auth/domain/entities/user_profile.dart';
@@ -44,9 +45,13 @@ class _AppModuleSwitcherState extends ConsumerState<AppModuleSwitcher> {
     final active = ref.watch(activeAppModuleProvider) ?? access.defaultModule;
     final nextModule = _nextModule(active, access.enabledModules);
     final style = _ModuleToggleStyle.forModule(active);
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    final iconSize = compact ? 15.0 : 20.0;
+    final labelSize = compact ? 11.0 : 13.0;
+    final swapSize = compact ? 14.0 : 18.0;
 
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: EdgeInsets.only(right: compact ? 4 : 8),
       child: Tooltip(
         message: 'Alternar para ${nextModule.label}',
         child: MouseRegion(
@@ -60,8 +65,9 @@ class _AppModuleSwitcherState extends ConsumerState<AppModuleSwitcher> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              height: compact ? 32 : 40,
+              padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 14),
+              constraints: compact ? const BoxConstraints(maxWidth: 118) : null,
               decoration: BoxDecoration(
                 gradient: _hovered ? style.gradientHover : style.gradient,
                 borderRadius: BorderRadius.circular(ClayTokens.radiusFull),
@@ -73,22 +79,26 @@ class _AppModuleSwitcherState extends ConsumerState<AppModuleSwitcher> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(style.icon, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    active.label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      letterSpacing: 0.2,
+                  Icon(style.icon, color: Colors.white, size: iconSize),
+                  SizedBox(width: compact ? 5 : 8),
+                  Flexible(
+                    child: Text(
+                      active.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.body(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: labelSize,
+                        height: 1.1,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: compact ? 3 : 6),
                   Icon(
                     Icons.swap_horiz_rounded,
                     color: Colors.white.withValues(alpha: 0.9),
-                    size: 18,
+                    size: swapSize,
                   ),
                 ],
               ),

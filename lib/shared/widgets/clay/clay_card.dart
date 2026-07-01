@@ -51,6 +51,7 @@ class ClayStatCard extends StatelessWidget {
     required this.accentColor,
     this.onTap,
     this.gradientIndex = 0,
+    this.compact = false,
   });
 
   final String title;
@@ -59,47 +60,96 @@ class ClayStatCard extends StatelessWidget {
   final Color accentColor;
   final VoidCallback? onTap;
   final int gradientIndex;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final iconBox = compact ? 26.0 : 48.0;
+    final iconSize = compact ? 14.0 : 24.0;
+
     return ClayCard(
       onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: ClayTokens.accentSurface,
-              borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+      padding: compact ? const EdgeInsets.all(8) : const EdgeInsets.all(22),
+      radius: compact ? ClayTokens.radiusSm : ClayTokens.radiusCard,
+      child: compact
+          ? Row(
+              children: [
+                Container(
+                  width: iconBox,
+                  height: iconBox,
+                  decoration: BoxDecoration(
+                    color: ClayTokens.accentSurface,
+                    borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                  ),
+                  child: Icon(icon, color: accentColor, size: iconSize),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: ClayTokens.foreground,
+                        ),
+                      ),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: ClayTokens.muted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: iconBox,
+                  height: iconBox,
+                  decoration: BoxDecoration(
+                    color: ClayTokens.accentSurface,
+                    borderRadius: BorderRadius.circular(ClayTokens.radiusSm),
+                  ),
+                  child: Icon(icon, color: ClayTokens.accent, size: iconSize),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
+                            color: ClayTokens.foreground,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: ClayTokens.muted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: Icon(icon, color: ClayTokens.accent, size: 24),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                      color: ClayTokens.foreground,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ClayTokens.muted,
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
